@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>评论区互动 Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Single light theme by choice: the demo mirrors the app's own light UI. All colors set explicitly. */
+:root{color-scheme:light;--page:#F7F7F7;--ink:#222;--mute:#8C8C8C;--mute2:#AAAAAA}
+html,body{height:100%;margin:0}
+body{background:var(--page);color:var(--ink);font-family:"Noto Sans SC","Noto Sans CJK SC","PingFang SC",-apple-system,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+[hidden]{display:none!important}
+.stage{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;gap:56px;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.rail{width:300px;flex:none;display:flex;flex-direction:column;gap:14px;align-self:flex-start}
+.rail h1{font-size:20px;font-weight:600;margin:0 0 6px 4px;line-height:1.3;letter-spacing:.01em}
+.paths{display:flex;flex-direction:column;gap:6px}
+.path{border-radius:14px;transition:background .2s,box-shadow .2s}
+.path.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06)}
+.pathbtn{display:flex;gap:12px;align-items:baseline;text-align:left;padding:13px 16px;border-radius:14px;width:100%}
+.path:not(.on) .pathbtn:hover{background:rgba(255,255,255,.65)}
+.pathbtn .k{font-weight:600;width:24px;height:24px;border-radius:12px;background:#fff;color:#8C8C8C;display:grid;place-items:center;font-size:12px;flex:none;box-shadow:inset 0 0 0 1px #E3E4E8}
+.pathbtn .rng{margin-left:auto;font-size:12px;color:var(--mute2);font-variant-numeric:tabular-nums;letter-spacing:.02em;transition:color .25s}
+.path.on .pathbtn .rng{color:var(--mute)}
+.pathbtn b{display:block;font-size:15px;font-weight:500;color:#222}
+.path:not(.on) .pathbtn b{color:#555}
+.pathbtn span span{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+.pbody{height:0;overflow:hidden}
+.pin{padding:2px 16px 14px}
+.path .pathbtn .k,.path .pathbtn b{transition:background .25s,color .25s,box-shadow .25s}
+.steps li{transition:color .25s}
+.steps li::before{transition:background .25s,border-color .25s,box-shadow .3s}
+.cur.in{animation:curin .32s cubic-bezier(.32,.72,0,1) both}
+@keyframes curin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.acts button,.restart,.pathbtn{transition:transform .1s ease-out,background .2s}
+.acts button:active,.restart:active{transform:scale(.97)}
+.path:not(.on) .pathbtn:active{transform:scale(.99)}
+.steps{list-style:none;margin:0;padding:0}
+.steps li{position:relative;padding:0 0 14px 24px;font-size:13px;line-height:20px;color:var(--mute2)}
+.steps li::before{content:"";position:absolute;left:8px;top:6px;width:8px;height:8px;border-radius:50%;box-sizing:border-box;border:1.5px solid #D5D6DA;background:#fff}
+.steps li:not(:last-child)::after{content:"";position:absolute;left:11.25px;top:17px;bottom:-1px;width:1.5px;background:#ECEDF0}
+.steps li.done{color:var(--mute)}
+.steps li.done::before{background:#C9CBD0;border-color:#C9CBD0}
+.steps li.now{color:#222;font-weight:500}
+.steps li.now::before{background:#FF2442;border-color:#FF2442;box-shadow:0 0 0 4px rgba(255,36,66,.14)}
+.steps li.fin::before{background:#222;border-color:#222}
+.steps li.fin{color:#222;font-weight:500}
+.cur{margin-top:8px;padding:10px 12px;border-radius:10px;background:#F6F7F9;font-size:13.5px;line-height:1.55;color:#222;font-weight:400}
+.cur .note{display:block;font-size:12px;color:#B26A00;margin-top:4px}
+.cur .note:empty{display:none}
+.stepbtn{display:block;width:100%;text-align:left;font:inherit;color:inherit;padding:0;border-radius:6px;transition:color .2s}
+.stepbtn:hover{color:#222}
+.steps li.now .stepbtn{cursor:default}
+.ctl{display:flex;gap:14px;margin-top:10px;padding-top:9px;border-top:1px solid #E9EAEE}
+.ctl button{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:#666;transition:color .2s,transform .1s ease-out}
+.ctl button:hover{color:#222}
+.ctl button:active{transform:scale(.97)}
+.ctl:empty{display:none}
+.msheet .msteps{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 8px 16px}
+.msheet .msteps button{font-size:12px;padding:5px 10px;border-radius:12px;background:#fff;border:1px solid #E3E4E8;color:#444}
+.msheet .msteps button.on{border-color:#222;color:#222;font-weight:500}
+.restart{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--mute);margin:2px 0 0 24px;transition:color .2s,transform .1s ease-out}
+.restart:hover{color:#222}
+.phone{flex:none;position:relative;border-radius:46px;background:#111;padding:9px}
+.screen{position:relative;overflow:hidden;background:#fff;border-radius:38px;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.mbar{display:none}
+
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.acts:empty{display:none}
+.acts button{height:32px;padding:0 14px;border-radius:16px;font-size:13px;border:1px solid #DDD;background:#fff;color:#222}
+.acts button.pri{background:#222;color:#fff;border-color:#222}
+/* phone layout: a slim header (path + replay/skip), the phone with its frame so you can see the canvas, the next step in a card at the bottom */
+.mhead{display:none}
+  html.m .stage{display:flex;justify-content:center;align-items:flex-start;min-height:0;padding:6px 16px 0;gap:0}
+  html.m .rail{display:none}
+  html.m .mhead{display:block;position:sticky;top:0;z-index:80;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 10px;background:var(--page)}
+  html.m .mprog{display:flex;align-items:center;justify-content:space-between;height:28px;font-size:13px;color:#222}
+  html.m .mprog .pg{display:flex;align-items:center;gap:6px;margin-right:-8px}
+  html.m .mprog .pg button{width:30px;height:30px;display:grid;place-items:center;color:#222;background:none;transition:transform .1s ease-out,opacity .1s}
+  html.m .mprog .pg button:disabled{color:#CFCFD3}
+  html.m .mprog .pg button:active:not(:disabled){transform:scale(.9);opacity:.6}
+  html.m .mprog b{font-weight:500}
+  html.m .mprog i{font-style:normal;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+  /* progress = 15 steps you can tap; a wider gap between sections */
+  html.m .mtrack{display:flex;gap:7px;height:20px;margin-top:0}
+  html.m .mtrack .sec{display:flex;gap:2px}
+  html.m .mtrack button{flex:1;position:relative;padding:0;height:20px}
+  html.m .mtrack button::before{content:'';position:absolute;left:0;right:0;top:8px;height:3px;border-radius:2px;background:#E2E3E6;transition:background .25s}
+  html.m .mtrack button.done::before{background:#222}
+  html.m .mtrack button:active::before{background:#999}
+  html.m .mbar{display:flex;flex-direction:column;position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:80;background:#fff;border-radius:14px;padding:12px 14px 10px;box-shadow:0 0 0 1px rgba(0,0,0,.04),0 6px 24px rgba(0,0,0,.08);color:#222}
+  html.m .mtitle{min-height:20px;font-size:14.5px;font-weight:500;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.m .mmsg{margin-top:3px;font-size:13px;line-height:19px;height:38px;color:#666;overflow:hidden}
+  html.m .mmsg .mnote{color:#B26A00}
+  html.m .mfoot{display:flex;align-items:center;gap:8px;margin-top:8px;height:30px}
+  html.m .mfoot .acts{flex:1;min-width:0}
+  html.m .mctl{display:flex;align-items:center;gap:6px;margin-left:auto;flex:none}
+  html.m .mctl button{display:inline-flex;align-items:center;gap:4px;height:30px;font-size:13px;color:#555;padding:0 6px}
+  html.m .mctl button.next{background:#222;color:#fff;border-radius:15px;padding:0 14px;font-weight:500}
+  html.m .mctl button:active{transform:scale(.96)}
+  html.m .mbar .acts{margin-top:0;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none}
+  html.m .mbar .acts::-webkit-scrollbar{display:none}
+  html.m .mbar .acts button{flex:none;height:28px;font-size:12.5px;padding:0 12px;background:#fff;color:#222;border-color:#DADCE0}
+  html.m .mbar .acts button.pri{background:#222;color:#fff;border-color:#222}
+  html.m .phone{margin:0 auto;padding:6px}
+/* phone layout on a computer: progress, phone and the step card as one group, centred on the screen, the card right under the phone */
+html.m.wide body{display:flex;flex-direction:column;justify-content:center;min-height:100vh;min-height:100dvh;padding:40px 0;box-sizing:border-box}
+html.m.wide .mhead{position:static;width:430px;max-width:100%;margin:0 auto;padding:0 12px 14px;box-sizing:border-box}
+html.m.wide .stage{flex:none;padding-top:0}
+html.m.wide .mbar{position:static;width:406px;margin:14px auto 0}
+/* 电脑版 / 手机版 switch: only on a wide screen (a phone can't fit the desktop layout) */
+.modesw{display:none;position:fixed;top:16px;right:20px;z-index:95;background:#EAEAEC;border-radius:16px;padding:2px;gap:2px}
+html.wide .modesw{display:flex}
+.modesw button{height:28px;padding:0 13px;border-radius:14px;font-size:12.5px;color:#666;transition:background .2s,color .2s,box-shadow .2s}
+.modesw button[aria-pressed="true"]{background:#fff;color:#222;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.modesw button:active{transform:scale(.97)}
+.msheet{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.4);display:flex;align-items:flex-end}
+.msheet .box{background:#fff;width:100%;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.msheet .pathbtn{background:#F6F6F8}
+/* rendered figma layers */
+.n{position:absolute;margin:0}
+.t{white-space:pre}
+.t.wrap{white-space:pre-wrap;word-break:break-all}
+.n svg{display:block;overflow:visible}
+.hot{position:absolute;z-index:40;cursor:pointer;border-radius:8px}
+.layer{position:absolute;inset:0}
+.dimfade{animation:fade .25s ease-out both}
+.slideup{animation:up .34s cubic-bezier(.2,.8,.2,1) both}
+.pushin{animation:push .32s cubic-bezier(.2,.8,.2,1) both}
+.fadein{animation:fade .3s ease-out both}
+.pop{animation:pop .18s ease-out both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes up{from{transform:translateY(var(--dy,100%))}to{transform:none}}
+@keyframes push{from{transform:translateX(30%);opacity:.4}to{transform:none;opacity:1}}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes drop{from{transform:translateY(-130%)}to{transform:none}}
+@keyframes blink{50%{opacity:0}}
+.caret{animation:blink 1s steps(1) infinite}
+/* located comment: brief light-gray flash, same as jumping to a comment in the app */
+.mrow{background:#fff;color:#333;text-align:left;transition:background .12s}
+.mrow:active{background:#efefef;transition:none}
+.acts button.sel{border-color:#222;font-weight:500}
+.qa{color:#fff;text-align:left;padding:0;overflow:hidden;background:rgba(0,0,0,.45);
+  transition:width .3s cubic-bezier(.32,.72,0,1),height .3s cubic-bezier(.32,.72,0,1),border-radius .3s cubic-bezier(.32,.72,0,1),opacity .25s ease-out,transform .25s ease-out}
+.qa.hide{opacity:0;transform:translateY(3px);pointer-events:none}
+.qa.still{transition:none}
+.qa .qa-pill{position:absolute;left:0;bottom:0;display:flex;align-items:center;white-space:nowrap;font-weight:500;transition:opacity .12s .12s}
+.qa.open .qa-pill{opacity:0;transition-delay:0s}
+.qa .qa-body{position:absolute;left:0;bottom:0;opacity:0;transition:opacity .12s;pointer-events:none}
+.qa.open .qa-body{opacity:1;transition:opacity .16s .14s}
+.qa:not(.open):active{transform:scale(.96);transition:transform .1s ease-out}
+.locflash{animation:loc 1.6s ease-out both}
+@keyframes loc{0%,35%{background:#F2F2F2}100%{background:rgba(242,242,242,0)}}
+/* newly posted item: rows below make room, the item fades in */
+.makeroom{animation:room .34s cubic-bezier(.32,.72,0,1) backwards}
+@keyframes room{from{transform:translateY(var(--h))}to{transform:none}}
+.newitem{animation:newin .18s .06s ease-out backwards}
+/* after you mark it 「有用」, a light 关注 appears next to the 课代表 badge (the badge stays: it is the reason to follow) */
+button.fol{position:absolute;display:flex;align-items:center;padding:0;background:none;color:#FF2442;white-space:nowrap;font-weight:500;transition:opacity .22s ease-out,transform .3s cubic-bezier(.32,.72,0,1),color .2s}
+button.fol.off{opacity:0;transform:translateX(-4px);pointer-events:none}
+button.fol.gone{opacity:0;pointer-events:none;transition:opacity .45s ease-out}
+button.fol::after{content:'';position:absolute;inset:-9px -6px}
+button.fol:active{transform:scale(.94)}
+@keyframes newin{from{opacity:0}to{opacity:1}}
+/* in-app notification: white card under the status bar, sender's avatar */
+.banner{position:absolute;z-index:60;animation:drop .42s cubic-bezier(.32,.72,0,1) both;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04);display:flex;align-items:center;text-align:left;cursor:pointer;width:auto}
+.banner .av{flex:none;border-radius:50%;background:center/cover no-repeat}
+.banner .bx{flex:1;min-width:0;display:block}
+.banner .hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#333;white-space:nowrap}
+.banner .ht{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.banner .hd i{flex:none}
+.banner .hd b{font-weight:500}
+.banner .hd i{font-style:normal;color:#999}
+.banner .bd{display:block;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* reaction picker */
+.pkbox{animation:pkbox .2s cubic-bezier(.2,.8,.2,1) both;transform-origin:85% 100%}
+@keyframes pkbox{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.pkbox.out{animation:pkout .16s ease-in both}
+@keyframes pkout{to{transform:scale(.8);opacity:0}}
+.pkic{transform-origin:50% 50%;transition:transform .18s cubic-bezier(.34,1.56,.64,1);animation:pkin .34s cubic-bezier(.34,1.56,.64,1) backwards}
+@keyframes pkin{from{transform:translateY(5px) scale(.2);opacity:0}}
+.pkic.hov{transform:scale(1.18)} /* grows in place, stays inside the bar */
+.pkic.press{transform:scale(.92);transition-duration:.08s}
+.heartpress{transition:transform .2s ease-out;transform:scale(.86)}
+.sc{position:absolute;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+.sc::-webkit-scrollbar{display:none}
+.hsc{overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain}
+.spin{position:absolute;z-index:45;pointer-events:none}
+.spin svg{display:block;animation:spinr .9s linear infinite}
+.spin circle{animation:spind 1.3s ease-in-out infinite}
+@keyframes spinr{to{transform:rotate(360deg)}}
+@keyframes spind{0%{stroke-dasharray:6 100;stroke-dashoffset:0}50%{stroke-dasharray:62 100;stroke-dashoffset:-18}100%{stroke-dasharray:6 100;stroke-dashoffset:-94}}
+.imgin{animation:fade .22s ease-out backwards}
+.likepop{animation:likepop .42s cubic-bezier(.2,.7,.3,1) both}
+@keyframes likepop{0%{transform:scale(.3)}40%{transform:scale(1.22)}70%{transform:scale(.96)}100%{transform:none}}
+.unpop{animation:unpop .22s ease-out both}
+@keyframes unpop{0%{transform:scale(.6)}100%{transform:none}}
+.burst-ring{border-radius:50%;animation:ring .5s cubic-bezier(.25,.6,.35,1) both;pointer-events:none}
+@keyframes ring{0%{transform:scale(.35);opacity:1}32%{transform:scale(1);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.spark{border-radius:9px;animation:spark .45s cubic-bezier(.25,.6,.35,1) both;pointer-events:none}
+@keyframes spark{0%{transform:rotate(var(--a)) translateY(calc(var(--r)*.4)) scaleY(.4);opacity:0}25%{opacity:1}100%{transform:rotate(var(--a)) translateY(var(--r)) scaleY(1);opacity:0}}
+.end{position:absolute;inset:0;z-index:95;background:rgba(255,255,255,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;animation:fade .3s both}
+.end h2{font-size:19px;margin:0;font-weight:500}
+.end p{font-size:13px;color:var(--mute);margin:0 0 8px;line-height:1.6;max-width:260px}
+.end .row{display:flex;gap:10px}
+.end .row button{height:38px;padding:0 18px;border-radius:19px;font-size:14px;border:1px solid #DDD}
+.end .row button.pri{background:#222;color:#fff;border-color:#222}
+.toast{position:absolute;z-index:70;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;border-radius:8px;white-space:nowrap;animation:fade .2s both;pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important}}
+button:focus-visible,.hot:focus-visible{outline:2px solid #3478F6;outline-offset:2px}
+</style>
+
+<div class="modesw" role="group" aria-label="切换 Demo 版本"><button data-m="desktop">电脑版</button><button data-m="phone">手机版</button></div>
+<div class="mhead" id="mhead"><div class="mprog" id="mprog"></div><div class="mtrack" id="mtrack" aria-label="跳到某一步"></div></div>
+<div class="stage">
+  <aside class="rail" aria-label="Demo 导航">
+    <h1>评论区互动 Demo</h1>
+    <div class="paths" id="paths"></div>
+  </aside>
+  <div class="phone" id="phone"><div class="screen" id="screen"></div></div>
+</div>
+<div class="mbar" id="mbar"><div class="mtitle" id="mtitle"></div><div class="mmsg" id="mmsg" aria-live="polite"></div><div class="mfoot"><div class="acts" id="macts"></div><div class="mctl" id="mctl"></div></div></div>
+
+
+<script src="screens.js"></script>
+<script>
+/* ---------- renderer: draws a Figma screen from its exported layer tree ---------- */
+const FW=260, FH=565.27;
+let BID=0;const BADGE="<svg width=\"31\" height=\"8\" viewBox=\"0 0 31 8\" fill=\"none\"><rect width=\"30.7258\" height=\"7.88883\" rx=\"3.94442\" fill=\"#FFF3C4\"/><g clip-path=\"url(#clipBadge)\"><path d=\"M4.28372 3.34114L6.57368 2.37695L8.86363 3.34114L6.57368 4.30534L4.28372 3.34114Z\" stroke=\"#7A5C00\" stroke-width=\"0.409781\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M5.24759 3.82422V4.7161C5.24759 5.10177 5.85021 5.46334 6.57335 5.46334C7.2965 5.46334 7.89911 5.10177 7.89911 4.7161V3.82422\" stroke=\"#7A5C00\" stroke-width=\"0.409781\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M8.86328 3.3418V4.54704\" stroke=\"#7A5C00\" stroke-width=\"0.409781\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><path d=\"M11.5072 1.87896L11.8438 1.5897C11.9349 1.66683 12.0278 1.75449 12.1225 1.85266C12.2207 1.94733 12.3136 2.04199 12.4013 2.13666C12.4924 2.22782 12.5643 2.31021 12.6169 2.38384L12.2593 2.71517C12.2067 2.64154 12.1383 2.55564 12.0541 2.45747C11.97 2.3593 11.8806 2.25937 11.7859 2.15769C11.6913 2.05602 11.5983 1.9631 11.5072 1.87896ZM11.9437 6.22307L11.8385 5.77078L11.9384 5.59723L12.8693 4.80308C12.8904 4.8697 12.9184 4.94333 12.9535 5.02397C12.992 5.10461 13.0253 5.16772 13.0534 5.2133C12.8325 5.40614 12.6519 5.56217 12.5117 5.68137C12.375 5.80058 12.268 5.8935 12.1909 5.96011C12.1173 6.03024 12.0612 6.08283 12.0226 6.11789C11.9875 6.15646 11.9612 6.19152 11.9437 6.22307ZM11.2547 3.13591H12.2435V3.5882H11.2547V3.13591ZM12.8325 4.20353H16.088V4.65583H12.8325V4.20353ZM14.8258 4.43494C14.9274 4.60323 15.0537 4.77153 15.2044 4.93982C15.3552 5.10812 15.5165 5.26414 15.6883 5.4079C15.8601 5.55165 16.0284 5.6691 16.1932 5.76026C16.1371 5.80584 16.0757 5.8672 16.0091 5.94434C15.9425 6.01797 15.8881 6.08633 15.846 6.14945C15.6848 6.03374 15.5182 5.89174 15.3464 5.72345C15.1781 5.55165 15.0203 5.36582 14.8731 5.16597C14.7258 4.96261 14.5979 4.76276 14.4892 4.56642L14.8258 4.43494ZM13.553 2.96236V3.41991H15.3254V2.96236H13.553ZM13.553 2.12614V2.57317H15.3254V2.12614H13.553ZM13.1007 1.72644H15.7935V3.82487H13.1007V1.72644ZM14.1105 4.43494L14.4576 4.56116C14.3489 4.77854 14.2157 4.99242 14.0579 5.20279C13.9036 5.40965 13.7336 5.59898 13.5478 5.77078C13.3654 5.94258 13.1779 6.08283 12.985 6.19152C12.9605 6.15295 12.9289 6.11088 12.8904 6.0653C12.8518 6.01972 12.8115 5.97414 12.7694 5.92856C12.7308 5.88298 12.694 5.84616 12.659 5.81811C12.8483 5.72695 13.0341 5.6095 13.2164 5.46575C13.4023 5.31849 13.5723 5.15721 13.7266 4.9819C13.8844 4.80308 14.0123 4.62076 14.1105 4.43494ZM14.2472 1.91577H14.6995V3.61976H14.7206V6.38085H14.2315V3.61976H14.2472V1.91577ZM11.9437 6.22307C11.9227 6.19152 11.8946 6.15295 11.8596 6.10737C11.8245 6.0653 11.7859 6.02498 11.7438 5.98641C11.7053 5.94784 11.6702 5.91804 11.6387 5.897C11.6983 5.84441 11.7631 5.76552 11.8333 5.66034C11.9034 5.55165 11.9384 5.42367 11.9384 5.27641V3.13591H12.417V5.55515C12.417 5.55515 12.4013 5.57268 12.3697 5.60775C12.3381 5.6393 12.2978 5.68137 12.2487 5.73397C12.2032 5.78656 12.1558 5.84266 12.1067 5.90226C12.0612 5.96187 12.0226 6.01972 11.991 6.07582C11.9595 6.13191 11.9437 6.181 11.9437 6.22307ZM18.0444 3.29895L21.2788 2.87821L21.3472 3.35154L18.1128 3.77228L18.0444 3.29895ZM20.0639 1.8211L20.4321 1.58444C20.5338 1.66508 20.6372 1.75624 20.7424 1.85792C20.8476 1.9596 20.9457 2.06128 21.0369 2.16295C21.1281 2.26113 21.1999 2.35229 21.2525 2.43643L20.8581 2.69414C20.809 2.61349 20.7406 2.52233 20.653 2.42066C20.5653 2.31898 20.4707 2.21555 20.369 2.11036C20.2673 2.00167 20.1656 1.90525 20.0639 1.8211ZM17.8814 1.55288L18.3547 1.7054C18.225 2.01745 18.0707 2.32424 17.8919 2.62577C17.7131 2.92379 17.5185 3.20428 17.3081 3.46724C17.1012 3.7302 16.8891 3.96161 16.6717 4.16146C16.6542 4.12289 16.6279 4.07205 16.5929 4.00894C16.5613 3.94583 16.5262 3.88272 16.4877 3.81961C16.4491 3.7565 16.4158 3.70566 16.3877 3.66709C16.5841 3.4988 16.7752 3.30245 16.961 3.07806C17.1468 2.85367 17.3186 2.61174 17.4764 2.35229C17.6342 2.09283 17.7692 1.82636 17.8814 1.55288ZM17.3081 3.00443L17.813 2.49954L17.8183 2.5048V6.37559H17.3081V3.00443ZM19.1383 1.58444H19.6379C19.652 2.16295 19.6853 2.7029 19.7379 3.20428C19.7905 3.70215 19.8606 4.14218 19.9482 4.52435C20.0394 4.90301 20.1516 5.20279 20.2848 5.42367C20.4216 5.64105 20.5811 5.76202 20.7634 5.78656C20.83 5.79007 20.8844 5.71819 20.9265 5.57093C20.9685 5.42367 21.0001 5.20103 21.0211 4.90301C21.0562 4.93456 21.0983 4.96963 21.1473 5.00819C21.1999 5.04326 21.2525 5.07656 21.3051 5.10812C21.3612 5.13967 21.4033 5.16246 21.4313 5.17649C21.3928 5.49555 21.3402 5.74449 21.2736 5.9233C21.2069 6.09861 21.1316 6.21957 21.0474 6.28619C20.9668 6.3528 20.8774 6.38436 20.7792 6.38085C20.5373 6.35981 20.3287 6.26865 20.1533 6.10737C19.978 5.9496 19.829 5.73046 19.7063 5.44997C19.5871 5.16597 19.4889 4.82938 19.4118 4.4402C19.3347 4.04751 19.2751 3.61099 19.233 3.13065C19.1909 2.65031 19.1594 2.1349 19.1383 1.58444ZM22.1045 1.93155H26.3224V2.3628H22.1045V1.93155ZM22.3675 2.73095H26.1015V3.13591H22.3675V2.73095ZM21.8836 3.53035H26.4907V3.95635H21.8836V3.53035ZM23.9295 1.50555H24.4291V3.8722H23.9295V1.50555ZM23.8453 3.63554L24.2766 3.83539C24.1433 3.99667 23.9908 4.15094 23.819 4.2982C23.6472 4.44195 23.4614 4.58044 23.2615 4.71368C23.0652 4.8434 22.8636 4.96086 22.6567 5.06605C22.4499 5.17123 22.2465 5.26064 22.0467 5.33427C22.0221 5.2957 21.9906 5.25187 21.952 5.20279C21.9134 5.15019 21.8731 5.10111 21.831 5.05553C21.7925 5.00644 21.7539 4.96612 21.7153 4.93456C21.9117 4.87145 22.1115 4.79432 22.3149 4.70316C22.5182 4.60849 22.7146 4.50506 22.9039 4.39286C23.0968 4.27716 23.2738 4.1562 23.4351 4.02998C23.5964 3.90025 23.7331 3.76877 23.8453 3.63554ZM24.5606 3.77228C24.6728 4.09835 24.8253 4.39637 25.0181 4.66634C25.2145 4.93281 25.4494 5.16422 25.7229 5.36056C25.9999 5.5534 26.3154 5.69891 26.6695 5.79708C26.6345 5.83214 26.5959 5.87597 26.5538 5.92856C26.5118 5.97764 26.4714 6.02848 26.4329 6.08108C26.3978 6.13717 26.368 6.18801 26.3435 6.23359C25.9683 6.10737 25.637 5.93382 25.3495 5.71293C25.0655 5.49204 24.8218 5.22908 24.6184 4.92405C24.4151 4.61551 24.245 4.2684 24.1083 3.88272L24.5606 3.77228ZM25.9753 4.11413L26.3908 4.4139C26.205 4.55765 26.0051 4.70141 25.7912 4.84516C25.5809 4.9854 25.3863 5.10461 25.2075 5.20279L24.8919 4.93982C25.0076 4.8697 25.1321 4.78731 25.2653 4.69264C25.3985 4.59797 25.5265 4.4998 25.6492 4.39812C25.7755 4.29645 25.8841 4.20178 25.9753 4.11413ZM22.8513 6.38611L22.804 5.95485L23.0196 5.7813L24.6027 5.32375C24.6097 5.39036 24.6219 5.4675 24.6395 5.55515C24.657 5.64281 24.6728 5.71293 24.6868 5.76552C24.3151 5.88123 24.0154 5.97414 23.7875 6.04426C23.5631 6.11438 23.3878 6.17048 23.2615 6.21256C23.1388 6.25463 23.0477 6.28794 22.9881 6.31248C22.9285 6.33702 22.8829 6.36157 22.8513 6.38611ZM22.8513 6.38611C22.8408 6.34404 22.8233 6.2932 22.7987 6.23359C22.7742 6.17749 22.7479 6.1214 22.7198 6.0653C22.6918 6.01271 22.6638 5.97063 22.6357 5.93908C22.6883 5.91103 22.7391 5.8672 22.7882 5.8076C22.8408 5.74799 22.8671 5.6656 22.8671 5.56041V4.51383H23.3825V5.93908C23.3825 5.93908 23.365 5.94784 23.3299 5.96537C23.2949 5.98641 23.251 6.01271 23.1984 6.04426C23.1458 6.07932 23.0915 6.11614 23.0354 6.1547C22.9828 6.19678 22.939 6.2371 22.9039 6.27567C22.8689 6.31423 22.8513 6.35105 22.8513 6.38611Z\" fill=\"#7A5C00\"/><defs><clipPath id=\"clipBadge\"><rect width=\"5.78515\" height=\"5.78515\" fill=\"white\" transform=\"translate(3.68146 1.05176)\"/></clipPath></defs></svg>";
+let K=1.5, MOBILE=false, CUR=null;
+const $=s=>document.querySelector(s);
+const screen=$('#screen');
+const TXFIX={'《台式卤肉饭》':'台式卤肉饭','冰冻的肉是不是要焯水一下？':'没有红葱头，用洋葱代替可以吗？','冷水下锅焯一下，去血沫，炖出来不腥':'可以，用紫洋葱也行，小火慢慢炸别急','冻肉我是直接焯的':'我用的洋葱，一样香','大家晒的 12':'大家晒的 86','大家晒的 13':'大家晒的 87','+7':'+81','共 47 条评论':'共 326 条评论'};
+/* note page, matched to the app (same values written into Figma): bottom-bar icons redrawn rounder and bolder at the app's size,
+   counts in Inter Medium 10, laid out right-to-left from the screen edge; share arrow redrawn; sort icon = three centred lines;
+   no home indicator on the note page */
+const STAR_D=(()=>{const cx=13,cy=13.4,R=11,r=5.5;let d='';for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r:R;d+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(2)+' '+(cy+rr*Math.sin(a)).toFixed(2)+' ';}return d+'Z';})();
+const NOTE_IC={
+ 'ic/heart':{vis:15.7,l:2/26,w:22/26,ar:23/26,svg:'<svg width="26" height="23" viewBox="0 0 26 23" fill="none"><path d="M13 21.4C11.9 21.4 2 15.2 2 8.6C2 5.3 4.6 2.8 7.8 2.8C10.1 2.8 12 4.1 13 6C14 4.1 15.9 2.8 18.2 2.8C21.4 2.8 24 5.3 24 8.6C24 15.2 14.1 21.4 13 21.4Z" stroke="#333333" stroke-width="1.81" stroke-linejoin="round"/></svg>'},
+ 'ic/star':{vis:15.7,l:(13-11*Math.cos(Math.PI/10))/26,w:22*Math.cos(Math.PI/10)/26,ar:25/26,svg:`<svg width="26" height="25" viewBox="0 0 26 25" fill="none"><path d="${STAR_D}" stroke="#333333" stroke-width="1.72" stroke-linejoin="round"/></svg>`},
+ 'ic/comment':{vis:16.2,l:2.9/23,w:18.3/23,ar:1,svg:'<svg width="23" height="23" viewBox="0 0 23 23" fill="none"><path d="M9.37 20.28A9.4 9.4 0 1 0 4.6 17.24L2.9 20.9Z" stroke="#333333" stroke-width="1.22" stroke-linejoin="round"/><circle cx="8.1" cy="11.3" r="1.1" fill="#333333"/><circle cx="15.5" cy="11.3" r="1.1" fill="#333333"/></svg>'}};
+const SHARE_SVG='<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M13.5 4.2V8.3C7.4 8.9 3.4 12.8 2.8 19.8C5 16.2 8.4 14.4 13.5 14.3V18.5L21.4 11.4Z" stroke="#333333" stroke-width="1.9" stroke-linejoin="round"/></svg>';
+const SORT_SVG='<svg width="9.05" height="9.05" viewBox="0 0 9.05 9.05"><rect x="0.825" y="1.93" width="7.4" height=".54" rx=".27" fill="#333"/><rect x="1.725" y="4.23" width="5.6" height=".54" rx=".27" fill="#333"/><rect x="2.8" y="6.53" width="3.45" height=".54" rx=".27" fill="#333"/></svg>';
+function textW(str,fs,fam,wt){cv.font=`${wt} ${fs*10}px ${FAM[fam]}`;return cv.measureText(str).width/10;}
+function polishNote(t,id){const C=t.c;
+  // 共 N 条评论: Medium 9.05 #333, as in the app (it was Regular 8.41 in the export)
+  C.filter(o=>o.tx&&/^共 \d+ 条评论$/.test(txt(o))).forEach(o=>{const cy=o.y+o.h/2;o.tx[0][1]=9.05;o.tx[0][3]='Medium';o.tx[0][4]='#333333';o.h=11;o.y=cy-5.5;o.ar='W';});
+  C.forEach(o=>{if(o.w>80&&o.h<4&&o._ay>550)o._skip=1;}); // the app hides the home indicator here
+  const sh=C.find(o=>o.n==='ic/share-arrow');if(sh){sh.svgx=SHARE_SVG;sh.fit=1;}
+  const so=C.find(o=>o.n==='ic/sort');if(so){so.svgx=SORT_SVG;so.svg='sort';so.c=null;so.fit=1;so.w=so.h=9.05;}
+  const H=C.find(o=>o.n==='ic/heart'),St=C.find(o=>o.n==='ic/star'),Cm=C.find(o=>o.n==='ic/comment');if(!H||!St||!Cm)return;
+  const pill=C.find(o=>o.t==='RE'&&o.x<20&&o.w>80&&o.w<110&&Math.abs(o.y+o.h/2-(H.y+H.h/2))<6);const cy=pill?pill.y+pill.h/2:H.y+H.h/2;
+  const cnts=C.filter(o=>o.tx&&/^\d+$/.test(txt(o))&&Math.abs(o.y+o.h/2-cy)<5&&o.x>110).sort((a,b)=>a.x-b.x);
+  let x=251.2,left=0;
+  [[Cm,cnts[2]],[St,cnts[1]],[H,cnts[0]]].forEach(([ic,tx])=>{const sp=NOTE_IC[ic.n];const bw=sp.vis/sp.w;ic.w=bw;ic.h=bw*sp.ar;ic.y=cy-ic.h/2;ic.svgx=sp.svg;ic.fit=1;
+    if(tx){tx.tx[0][1]=8.9;tx.tx[0][2]='Inter';tx.tx[0][3]='Medium';tx.tx[0][4]='#222222';const tw=textW(txt(tx),8.9,'Inter',500);tx.w=tw;tx.h=10.8;tx.ar='W';tx.x=x-tw;tx.y=cy-5.4;x=tx.x-3.9;}
+    ic.x=x-bw*(sp.l+sp.w);left=ic.x+bw*sp.l;x=left-12.9;});
+  if(pill)pill.w=left-10.3-pill.x;
+  if(id==='s02'||id==='s06')moreComments(t,id);}
+/* the note page scrolls: a few more comments below the fold, built from the same row layout (avatar, name, text, time/回复, ♡ count, dislike) */
+const MORE={s02:[['i5','一颗卤蛋','八角放几颗合适？怕味道太冲','10-24 江苏',3],['i9','喵喵酱','没有砂锅，电饭煲能做吗','10-24 四川',0],['i11','阿杰下厨房','照着做了，配一颗卤蛋绝了','10-25 福建',5],['i7','苏苏','红葱头哪里能买到呀','10-26 湖北',0]],
+  s06:[['i15','小鹿','收藏了，周末照着做','10-23 上海',0],['i5','一颗卤蛋','八角放几颗合适？怕味道太冲','10-24 江苏',3],['i9','喵喵酱','没有砂锅，电饭煲能做吗','10-24 四川',0],['i11','阿杰下厨房','照着做了，配一颗卤蛋绝了','10-25 福建',5]]};
+function moreComments(t,id){const C=t.c;const cp=o=>JSON.parse(JSON.stringify(o,(k,v)=>k[0]==='_'?undefined:v));
+  const mi=C.findIndex(o=>o.tx&&txt(o)==='momo');const row=C.slice(mi-1,mi+5);const cntT=C.find(o=>o.tx&&/^\d+$/.test(txt(o))&&Math.abs(o.x-218.61)<1);
+  const rows=C.filter(o=>o.t==='EL'&&Math.abs(o.x-10.35)<.5&&o.y<500).map(o=>o.y);let y=Math.max(...rows)+62.42;const y0=row[0].y;
+  const bi=C.findIndex(o=>o.w>=259&&o.y>500);const add=[];
+  MORE[id].forEach(([img,name,text,time,n])=>{const d=y-y0;row.forEach(o=>{const c=cp(o);c.y+=d;if(c.t==='EL')c.f=[{img}];
+      if(c.tx){const v=txt(c);if(v==='momo')c.tx=[[name,...c.tx[0].slice(1)]];else if(/回复$/.test(v))c.tx=[[time+'   ',...c.tx[0].slice(1)],['回复',...c.tx[c.tx.length-1].slice(1)]];else c.tx=[[text,...c.tx[0].slice(1)]];}
+      add.push(c);});
+    if(n&&cntT){const c=cp(cntT);c.y=row.find(o=>/回复$/.test(txt(o))).y+d;c.tx=[[String(n),...c.tx[0].slice(1)]];add.push(c);}
+    y+=62.42;});
+  C.splice(bi,0,...add);}
+const XTHIN='<svg width="5.4" height="5.4" viewBox="0 0 5.4 5.4"><path d="M0.3 0.3L5.1 5.1M5.1 0.3L0.3 5.1" stroke="#8c8c8c" stroke-width=".65" stroke-linecap="round"/></svg>';
+function fixAtChip(t){const ch=t.c.find(o=>o.n==='@点点 ai');if(!ch||!ch.c)return;const cy=ch.y+ch.h/2;ch.w=61.4;ch.h=20.5;ch.y=cy-ch.h/2;ch.r=4.3;
+  const at=ch.c.find(o=>o.tx&&/点点/.test(txt(o))),ai=ch.c.find(o=>o.t==='FR'),x=ch.c.find(o=>o.tx&&txt(o)==='×');
+  at.tx[0][1]=8.4;at.x=6.7;at.h=8.4*1.19;at.y=(ch.h-at.h)/2;at.lt=0;at.w=textW(txt(at),8.4,'Noto Sans SC',500);
+  Object.assign(ai,{x:35.1,y:(ch.h-8.6)/2,w:8.6,h:8.6,r:2.2});const ait=ai.c[0];ait.tx[0][1]=6.4;Object.assign(ait,{x:0,y:0,w:8.6,h:8.6,al:'C',ar:'F',lt:1});
+  Object.assign(x,{t:'FR',tx:null,svg:'x',svgx:XTHIN,fit:1,x:61.4-6.5-5.4,y:(ch.h-5.4)/2,w:5.4,h:5.4});}
+function clone(id){const t=JSON.parse(JSON.stringify(SCREENS[id]));walk(t,o=>{if(o.tx){const v=txt(o);if(TXFIX[v])o.tx=[[TXFIX[v],...o.tx[0].slice(1)]];else if(v==='47'&&o._ay>470)o.tx=[['326',...o.tx[0].slice(1)]];}});
+  if(t.c.some(o=>o.n==='ic/share-arrow'))polishNote(t,id);
+  fixAtChip(t);
+  t.c.filter(o=>o.n==='badge · 课代表').forEach(b=>{const nm=t.c.filter(o=>o.tx&&Math.abs(o._ay-b._ay)<4&&o._ax<b._ax).sort((a,c)=>c._ax-a._ax)[0];if(!nm)return;b._nm=nm;b._gap=b.x-(nm.x+nm.w);t.c.splice(t.c.indexOf(b),1);t.c.splice(t.c.indexOf(nm)+1,0,b);});
+  return t;}
+const txt=o=>(o.tx||[]).map(s=>s[0]).join('');
+function walk(o,fn,ax=0,ay=0,parent=null){ax+=o.x;ay+=o.y;o._ax=ax;o._ay=ay;o._p=parent;fn(o);(o.c||[]).forEach(c=>walk(c,fn,ax,ay,o));}
+function find(tree,pred){const r=[];walk(tree,o=>{if(o!==tree&&pred(o))r.push(o)});return r;}
+const byText=(tree,s)=>find(tree,o=>o.tx&&txt(o)===s);
+const W={Regular:400,Medium:500,'Semi Bold':600,Bold:700};
+const FAM={'Noto Sans SC':'"Noto Sans SC","Noto Sans CJK SC","PingFang SC",-apple-system,sans-serif',Inter:'Inter,-apple-system,"PingFang SC",sans-serif'};
+const px=v=>(v*K).toFixed(2)+'px';
+function bg(f,o){if(!f)return '';const L=[];for(const p of f.slice().reverse()){
+  if(p.c)L.push(`linear-gradient(${p.c},${p.c})`);
+  else if(p.img)L.push(`url(img/${p.img}.jpg) center/cover no-repeat`);
+  else if(p.g)L.push(`linear-gradient(90deg,${p.s.map(s=>s[0]+' '+s[1]*100+'%').join(',')})`);}
+  return L.join(',');}
+function node(o,isRoot){
+  const d=document.createElement('div');d.className='n';o._el=d;
+  const st=d.style;
+  if(!isRoot){st.left=px(o.x);st.top=px(o.y);}
+  if(o.op!=null)st.opacity=o.op;
+  if(o.n==='badge · 课代表'){ // exported from Figma with the text outlined, so the label stays centred in any browser
+    d.innerHTML=BADGE.replace(/clipBadge/g,'clipBadge'+(++BID));d.classList.add('bdg');d._nmo=o._nm;const sv=d.firstChild;sv.setAttribute('width',(o.w*K).toFixed(2));sv.setAttribute('height',(o.h*K).toFixed(2));sv.setAttribute('preserveAspectRatio','none');return d;}
+  if(o.svg){const s=o.svgx||SVGS[o.svg];d.innerHTML=s;const sv=d.firstChild;let w=+sv.getAttribute('width'),h=+sv.getAttribute('height');if(o.fit){w=o.w;h=o.h;}
+    sv.setAttribute('width',(w*K).toFixed(2));sv.setAttribute('height',(h*K).toFixed(2));return d;}
+  if(o.tx){d.classList.add('t');const first=o.tx[0];
+    const fam=FAM[first[2]]||FAM['Noto Sans SC'];
+    // auto line height: use Figma's own box height (its line box is ~1.19em for Noto Sans SC), so glyphs centre the same way
+    const fs=Math.max(...o.tx.map(s=>s[1]));const ex=Math.max(...o.tx.map(s=>s[5]||0));
+    let L=ex;if(!L){const lines=Math.max(1,Math.round(o.h/(fs*1.19)));L=o.lt?fs*1.19:o.h/lines;}
+    st.lineHeight=px(L);st.fontSize=px(fs);st.fontFamily=fam; // the line box's strut uses this text's own font, so the baseline lands where the metrics say
+    if(o.ar!=='W'){st.width=px(o.w);d.classList.add('wrap');}
+    if(o.ar==='T'){st.height=px(o.h);st.overflow='hidden';if(o.tr){st.whiteSpace='pre';st.textOverflow='ellipsis';}}
+    st.textAlign={L:'left',C:'center',R:'right',J:'justify'}[o.al]||'left';
+    if(o.lt){st.top=px(o.y+o.h/2-L/2);st.whiteSpace='nowrap';} // one-line labels never wrap, whatever font the browser falls back to
+    d.dataset.fam=first[2];d.dataset.wt=W[first[3]]||400;d.dataset.fs=first[1];if(o.lt)d.dataset.lt=1;
+    for(const s of o.tx){const sp=document.createElement('span');sp.textContent=s[0];const ss=sp.style;
+      ss.fontSize=px(s[1]);ss.fontFamily=FAM[s[2]]||fam;ss.fontWeight=W[s[3]]||400;ss.color=s[4];if(s[6])ss.letterSpacing=px(s[6]);d.appendChild(sp);}
+    return d;}
+  st.width=px(o.w);st.height=px(o.h);
+  // a single solid fill as a plain colour: gradients don't paint on hairline (sub-pixel) boxes
+  const b=o.f&&o.f.length===1&&o.f[0].c?o.f[0].c:bg(o.f,o);if(b)st.background=b;
+  if(o.r!=null){st.borderRadius=o.r===999?'50%':Array.isArray(o.r)?o.r.map(px).join(' '):px(o.r);}
+  const sh=[];
+  if(o.s){const [c,w,a]=o.s;if(a==='I')sh.push(`inset 0 0 0 ${px(w)} ${c}`);else sh.push(`0 0 0 ${px(w)} ${c}`);}
+  (o.fx||[]).forEach(e=>{if(e.k==='D'&&!isRoot)sh.push(`${px(e.x)} ${px(e.y)} ${px(e.b)} ${px(e.sp)} ${e.c}`);if(e.k==='BB')st.backdropFilter=`blur(${px(e.b)})`;});
+  if(sh.length)st.boxShadow=sh.join(',');
+  if(o.cl&&!isRoot)st.overflow='hidden';
+  (o.c||[]).forEach(c=>{if(!c._skip)d.appendChild(node(c));});
+  return d;}
+/* render a screen; layerFrom = index of the first top-layer child (sheet/panel), animated in */
+function render(tree,{layerFrom=-1,anim=null,dy=0,from=null,scroll=null,hs=null,over=false}={}){
+  walk(tree,()=>{});ON_SLIDE=ON_ASK=null;
+  // small tags drawn as a coloured rectangle + a text on top (作者, chips…): the text is centred in its tag, both ways, by its ink
+  tree.c.forEach(r=>{if(r.t!=='RE'||r._skip||r.h>20||r.w>80||!r.f||!r.f[0].c||/^#fff/i.test(r.f[0].c))return;
+    tree.c.forEach(t=>{if(!t.tx||t._skip||t._tagc)return;if(t._ax<r._ax-1||t._ax+t.w>r._ax+r.w+1||t._ay<r._ay-1||t._ay+t.h>r._ay+r.h+1)return;
+      t._tagc=1;t.x=r.x;t.w=r.w;t.y=r.y;t.h=r.h;t.lt=1;t.al='C';t.ar='F';});});
+  const root=document.createElement('div');root.className='n';root.style.cssText=`left:0;top:0;width:${px(FW)};height:${px(FH)};background:${over?'transparent':tree.f[0].c};overflow:hidden`;
+  tree._el=root;
+  let layer=null;
+  // scroll: {top, keep} — layers from y=top down scroll under the fixed header (inner keeps the screen's own coordinates)
+  let sc=null,inner=null;
+  if(scroll)tree.c.forEach(c=>{if(c.w>80&&c.h<4&&c._ay>550)c._fixed=1;}); // home indicator stays put
+  if(scroll){const bottom=Math.max(...tree.c.filter(c=>!c._skip&&!c._fixed&&c._ay>=scroll.top).map(c=>c._ay+c.h))+(scroll.pad||6);const sb=scroll.bottom||FH;
+    sc=document.createElement('div');sc.className='sc';sc.style.cssText=`left:0;top:${px(scroll.top)};width:${px(FW)};height:${px(sb-scroll.top)}`;root._scr={inner,top:scroll.top,bottom:sb};
+    inner=document.createElement('div');inner.style.cssText=`position:relative;height:${px(bottom)};margin-top:${px(-scroll.top+(scroll.above||0))}`;sc.appendChild(inner);root.appendChild(sc);
+    sc._inner=inner;tree._sc=sc;dragScroll(sc);root._scr.inner=inner;}
+  // hs: horizontal strips (tabs, chips) that scroll sideways; same coordinate trick as the vertical list
+  const strips=(hs||[]).map(g=>{const box=document.createElement('div');box.className='sc hsc';box.style.cssText=`left:${px(g.x)};top:${px(g.y)};width:${px(g.w)};height:${px(g.h)}`+(g.fade?(m=>`;-webkit-mask-image:${m};mask-image:${m}`)(`linear-gradient(90deg,#000 ${px(g.fade[0]-g.x)},rgba(0,0,0,${g.fade[1]}) 100%)`):'');
+    const right=Math.max(...tree.c.filter(c=>!c._skip&&g.pick(c)).map(c=>c._ax+c.w))+(g.pad||0);
+    const inn=document.createElement('div');inn.style.cssText=`position:relative;width:${px(right)};height:${px(g.y+g.h)};margin-left:${px(-g.x)};margin-top:${px(-g.y)}`;box.appendChild(inn);root.appendChild(box);dragScroll(box,'x');return {g,box,inn};});
+  tree.c.forEach((c,i)=>{if(c._skip||(over&&i<layerFrom))return;const el=node(c);
+    const st=strips.find(z=>z.g.pick(c));if(st){st.inn.appendChild(el);walk(c,k=>k._sc=st.inn);return;}
+    if(inner&&(c._ay>=scroll.top||c._inScroll)&&!c._fixed){inner.appendChild(el);walk(c,k=>k._sc=inner);return;}
+    if(layerFrom>=0&&i>=layerFrom){if(!layer){layer=document.createElement('div');layer.className='layer';root.appendChild(layer);}layer.appendChild(el);}
+    else root.appendChild(el);});
+  const old=CUR&&CUR.parentNode===screen?CUR:screen.lastChild;CUR=root;const EASE='cubic-bezier(.32,.72,0,1)';
+  const drop=(el,ms)=>setTimeout(()=>el&&el.remove(),ms);
+  if(old&&over){old.style.pointerEvents='none';screen.appendChild(root);root._under=old;}
+  else if(old&&anim==='push'){ // iOS push: new page from the right, old page drifts left under a light shade
+    screen.appendChild(root);root.style.boxShadow='-8px 0 24px rgba(0,0,0,.12)';root.style.transform='translateX(100%)';
+    const shade=document.createElement('div');shade.className='n pshade';shade.style.cssText='left:0;top:0;right:0;bottom:0;background:#000;opacity:0;transition:opacity .38s;z-index:55';old.appendChild(shade);
+    old.style.pointerEvents='none';old.querySelectorAll('.banner,.toast').forEach(e=>e.remove());
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{root.style.transition=old.style.transition=`transform .38s ${EASE}`;root.style.transform='none';old.style.transform='translateX(-30%)';shade.style.opacity=.08;}));
+    PREV=old;setTimeout(()=>{if(old.parentNode&&CUR!==old)old.remove();},420);}
+  else if(old&&anim==='expand'&&from){ // note opens from its card: scales up from the card's place while its frame opens to full screen
+    old.style.pointerEvents='none';screen.appendChild(root);const k=from.w/FW,vis=from.h/k;
+    root.style.transformOrigin='0 0';root.style.transform=`translate(${px(from.x)},${px(from.y)}) scale(${k})`;root.style.clipPath=`inset(0 0 ${px(FH-vis)} 0 round ${px(2.15/k)})`;root.style.opacity=.35;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{const T='.3s cubic-bezier(.2,.8,.2,1)';root.style.transition=`transform ${T},clip-path ${T},opacity .12s linear`;root.style.transform='none';root.style.clipPath='inset(0 0 0 0 round 0)';root.style.opacity=1;}));drop(old,340);}
+  else if(old&&anim==='pop'){ // back: page slides out to the right, the page under it comes back from the left
+    old.style.pointerEvents='none';screen.insertBefore(root,old);root.style.transform='translateX(-30%)';
+    const sh=document.createElement('div');sh.className='n';sh.style.cssText='left:0;top:0;right:0;bottom:0;background:#000;opacity:.08;transition:opacity .36s;z-index:55;pointer-events:none';root.appendChild(sh);
+    old.style.boxShadow='-8px 0 24px rgba(0,0,0,.12)';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{root.style.transition=old.style.transition=`transform .36s ${EASE}`;root.style.transform='none';old.style.transform='translateX(100%)';sh.style.opacity=0;}));
+    setTimeout(()=>sh.remove(),400);drop(old,400);}
+  else if(old&&anim==='dismiss'){ // close the sheet / input panel that sits on the old screen
+    old.style.pointerEvents='none';screen.insertBefore(root,old);const ol=old.querySelector(':scope > .layer');
+    [...old.children].forEach(c=>{if(c!==ol)c.style.visibility='hidden';});old.style.background='transparent';
+    if(ol){const dim=ol.firstChild;const rest=[...ol.children].slice(1);[dim,...rest].forEach(e=>{e.style.animation='none';});void ol.offsetWidth;
+      requestAnimationFrame(()=>{dim.style.transition='opacity .26s';dim.style.opacity=0;
+      rest.forEach(e=>{e.style.transition=`transform .3s ${EASE}`;e.style.transform=`translateY(${px(dy)})`;});});}
+    drop(old,340);if(old._under){old._under.style.visibility='hidden';drop(old._under,340);}}
+  else if(old&&anim==='fade'){old.style.pointerEvents='none';screen.appendChild(root);root.style.opacity=0;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{root.style.transition='opacity .18s ease-out';root.style.opacity=1;}));drop(old,220);}
+  else{screen.innerHTML='';screen.appendChild(root);}
+  fixMetrics();if(MOBILE)$('#phone').style.background=tree.f[0].c;
+  if(sc&&scroll.note){sc.scrollTop=(NOTE_TOP==null?scroll.above:NOTE_TOP)*K;sc.addEventListener('scroll',()=>NOTE_TOP=sc.scrollTop/K);carousel(tree,sc);}
+  // sort icon follows the comment-count text (its width changes with the number)
+  const so=tree.c.find(o=>o.n==='ic/sort'),ct=tree.c.find(o=>o.tx&&/^共 \d+ 条评论$/.test(txt(o)));
+  if(so&&ct&&so._el&&ct._el)so._el.style.left=px(ct.x+ct._el.offsetWidth/K+3.3);
+  root.addEventListener('click',e=>{if(e.target.closest('.hot,button,.banner'))return;if(TIP&&ACTS.length===0)note('这里在 Demo 里没有做，按下方的提示继续');});
+  autoLikes(tree,layerFrom);
+  if(layer&&anim==='up'){const dim=layer.firstChild;
+    layer.style.setProperty('--dy',px(dy));
+    // overlay fades, panel slides
+    const kids=[...layer.children];const wrap=document.createElement('div');wrap.className='layer slideup';wrap.style.setProperty('--dy',px(dy));
+    kids.slice(1).forEach(k=>wrap.appendChild(k));layer.appendChild(wrap);dim.classList.add('dimfade');}
+  return root;}
+/* Figma's baseline sits where Noto Sans SC's (asc 1.16 / desc .288) or Inter's (.969/.242) metrics put it.
+   If the browser falls back to another font (PingFang, etc.), shift each text so its baseline lands in the same place. */
+const REF={'Noto Sans SC':[1.16,.288],Inter:[.969,.242]};const MC={};const cv=document.createElement('canvas').getContext('2d');
+function metricShift(fam,wt){const k=fam+wt;if(MC[k]!=null)return MC[k];const css=(FAM[fam]||FAM['Noto Sans SC']);cv.font=`${wt} 100px ${css}`;
+  const m=cv.measureText('中Hg');const A=m.fontBoundingBoxAscent/100,D=m.fontBoundingBoxDescent/100;const [ra,rd]=REF[fam]||REF['Noto Sans SC'];
+  const v=(A&&D)?((ra-rd)/2-(A-D)/2):0;return MC[k]=v;}
+/* texts inside tags / pills (cap-height trimmed in Figma) are centred by their actual ink, whatever font the browser ends up using */
+function inkShift(d){const fs=+d.dataset.fs,sp=d.firstChild;if(!sp)return 0;const cs=getComputedStyle(sp);cv.font=`${cs.fontWeight} 100px ${cs.fontFamily}`;const m=cv.measureText(d.textContent||'中');
+  const ia=m.actualBoundingBoxAscent/100,idn=m.actualBoundingBoxDescent/100;if(!(ia+idn))return 0;
+  // where the browser really put the baseline (probe), then centre the glyphs' ink in the box
+  d.style.transform='';const pr=document.createElement('span');pr.style.cssText='display:inline-block;width:0;height:0;vertical-align:baseline';sp.appendChild(pr);
+  const r=d.getBoundingClientRect(),Hp=parseFloat(getComputedStyle(d).height)||r.height,sc=r.height/Hp||1;
+  const base=(pr.getBoundingClientRect().top-r.top)/sc/(fs*K);pr.remove();
+  const L=Hp/(fs*K);return L/2-(base-(ia-idn)/2);}
+function placeBadges(){screen.querySelectorAll('.n.bdg').forEach(d=>{const nm=d._nmo&&d._nmo._el;if(!nm||!nm.isConnected)return;const r=nm.getBoundingClientRect(),sc=r.width/(nm.offsetWidth||r.width)||1;
+  const sp=nm.firstChild,w=(sp&&sp.getBoundingClientRect?sp.getBoundingClientRect().width:r.width)/sc;d.style.left=px(parseFloat(nm.style.left)/K+w/K+3.2);});}
+function fixMetrics(){for(const k in MC)delete MC[k];placeBadges();screen.querySelectorAll('.t[data-fam]').forEach(d=>{const v=d.dataset.lt?inkShift(d):metricShift(d.dataset.fam,d.dataset.wt);d.style.transform=v?`translateY(${(v*d.dataset.fs*K).toFixed(2)}px)`:'';});}
+if(document.fonts){document.fonts.addEventListener&&document.fonts.addEventListener('loadingdone',fixMetrics);document.fonts.ready.then(fixMetrics);}
+// texts added after a render (a tag swapped in after a tap, a toast…) get the same centring
+{let q=0;new MutationObserver(ms=>{if(q)return;if(ms.some(m=>[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches('.t[data-fam]')||n.querySelector('.t[data-fam]')))))q=requestAnimationFrame(()=>{q=0;fixMetrics();});}).observe(screen,{childList:true,subtree:true});}
+function hot(o,fn,{pad=4,label=''}={}){const h=document.createElement('button');h.className='hot';h.setAttribute('aria-label',label||txt(o)||o.n);
+  const x=o._ax-pad,y=o._ay-pad;h.style.cssText=`left:${px(x)};top:${px(y)};width:${px(o.w+pad*2)};height:${px(o.h+pad*2)}`;
+  h.onclick=e=>{e.stopPropagation();if(h._dragged)return;fn(e);};(o._sc&&o._sc.isConnected?o._sc:CUR).appendChild(h);return h;}
+function hotRect(x,y,w,h,fn,label){const s=CUR&&CUR._scr;return hot({_ax:x,_ay:y,w,h,n:label,_sc:s&&y>=s.top&&y+h<=s.bottom?s.inner:null},fn,{pad:0,label});}
+function setText(o,s){o.tx=[[s,...o.tx[0].slice(1)]];}
+function toast(msg,yFig=270,ms=1700){const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  t.style.cssText+=`;top:${px(yFig)};font-size:${px(9.05)};padding:${px(7)} ${px(14)};border-radius:${px(14)}`;CUR.appendChild(t);setTimeout(()=>t.remove(),ms);}
+/* lists scroll natively (touch / trackpad / wheel); with a mouse you can also drag, like a finger */
+function dragScroll(sc,ax='y'){let y0=null,st=0,moved=false,v=0,lt=0,ly=0,raf=0;const P=e=>ax==='x'?e.clientX:e.clientY,S=ax==='x'?'scrollLeft':'scrollTop';
+  sc.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0)return;cancelAnimationFrame(raf);y0=P(e);st=sc[S];moved=false;v=0;lt=performance.now();ly=P(e);e.stopPropagation();});
+  addEventListener('pointermove',e=>{if(y0==null)return;if(sc._lock){y0=null;return;}const d=P(e)-y0;if(Math.abs(d)>4)moved=true;if(moved){sc[S]=st-d;const now=performance.now();v=(P(e)-ly)/Math.max(1,now-lt);lt=now;ly=P(e);}});
+  addEventListener('pointerup',()=>{if(y0==null)return;y0=null;if(!moved)return;
+    sc.querySelectorAll('.hot').forEach(h=>h._dragged=true);setTimeout(()=>sc.querySelectorAll('.hot').forEach(h=>h._dragged=false),0);
+    // a little momentum after a flick
+    let vel=v*16;const step=()=>{if(Math.abs(vel)<.4)return;sc[S]-=vel;vel*=.94;raf=requestAnimationFrame(step);};step();});}
+/* the app's loading spinner. On a chip: the label fades and the spinner turns in its place until the result is ready */
+function spinner(cx,cy,d,parent){const w=document.createElement('div');w.className='spin';w.style.cssText=`left:${px(cx-d/2)};top:${px(cy-d/2)};width:${px(d)};height:${px(d)}`;
+  w.innerHTML=`<svg width="${(d*K).toFixed(2)}" height="${(d*K).toFixed(2)}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="#FF2442" stroke-width="2" stroke-linecap="round" pathLength="100"/></svg>`;(parent||CUR).appendChild(w);return w;}
+let BUSY=false;
+/* delayed steps of a flow (banners, toasts, auto tips) are tracked so jumping to another step cancels them */
+const TIMERS=new Set();{const st=window.setTimeout.bind(window);window.setTimeout=(f,ms,...a)=>{const id=st(()=>{TIMERS.delete(id);typeof f==='function'?f(...a):0;},ms);TIMERS.add(id);return id;};}
+function clearFlow(){QA_OPEN=false;TIMERS.forEach(id=>clearTimeout(id));TIMERS.clear();BUSY=false;PREV=null;NOTE_TOP=null;NOTE_SLIDE=0;document.querySelectorAll('.msheet').forEach(m=>m.remove());screen.innerHTML='';CUR=null;}
+/* as in the recording: the tapped tab turns on at once; a small light loading card with the red spinner sits in the
+   middle of the screen while the results load (the old results stay underneath), then the results switch */
+function loadingCard(ms,done){if(BUSY)return;BUSY=true;const d=29,w=document.createElement('div');w.className='n loadcard';
+  w.style.cssText=`left:${px(FW/2-d/2)};top:${px(FH/2-d/2)};width:${px(d)};height:${px(d)};border-radius:${px(6)};background:rgba(242,242,242,.96);box-shadow:0 ${px(1)} ${px(6)} rgba(0,0,0,.06);z-index:46;display:grid;place-items:center`;
+  CUR.appendChild(w);spinner(0,0,15,w).style.cssText+=`;position:static`;
+  setTimeout(()=>{BUSY=false;w.remove();done&&done();},ms);}
+/* a list page that loads after the push: blank under the nav bar with the spinner in the middle, then the list */
+function pageLoading(ms=450){const c=document.createElement('div');c.className='n';c.style.cssText=`left:0;top:${px(75.5)};width:${px(FW)};height:${px(470)};background:#fff;z-index:44`;CUR.appendChild(c);BUSY=false;loadingCard(ms,()=>c.remove());}
+/* the app's own black toast, same size and type as the 「晒好啦」 toast in Figma (9.05 Medium, 18.8 side padding, 25.87 tall) */
+function appToast(msg,{y=269.59,delay=0,ms=1500}={}){const fs=9.05,w=msg.length*fs+37.53,x=(FW-w)/2;
+  const t=document.createElement('div');t.className='n';t.style.cssText=`left:${px(x)};top:${px(y)};width:${px(w)};height:${px(25.87)};border-radius:${px(12.94)};background:rgba(0,0,0,.75);color:#fff;font-weight:500;font-size:${px(fs)};line-height:${px(25.87)};text-align:center;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none`;
+  t.textContent=msg;CUR.appendChild(t);setTimeout(()=>t.style.opacity=1,delay);setTimeout(()=>{t.style.opacity=0;setTimeout(()=>t.remove(),250);},delay+ms);return t;}
+/* in-app notification (the user is inside 小红书): sender's avatar, who + what, the reply itself */
+function banner(av,name,action,body,fn){const b=document.createElement('button');b.className='banner';b.setAttribute('aria-label',`通知：${name}${action}`);
+  b.style.cssText+=`;left:${px(7.76)};right:${px(7.76)};top:${px(31.5)};border-radius:${px(10.35)};padding:${px(8.4)} ${px(10.35)};gap:${px(7.76)}`;
+  b.innerHTML=`<span class="av" style="width:${px(25.43)};height:${px(25.43)};background-image:url(img/${av}.jpg)"></span>
+   <span class="bx"><span class="hd" style="font-size:${px(8.2)};line-height:${px(11)}"><span class="ht"><b>${name}</b> ${action}</span><i style="font-size:${px(7.2)}">刚刚</i></span><span class="bd" style="font-size:${px(7.91)};line-height:${px(10.5)};margin-top:${px(2.6)}">${body}</span></span>`;
+  b.onclick=()=>{b.remove();fn();};CUR.appendChild(b);return b;}
+/* comment hearts: tap to like (shrink, filled heart springs in with a ring, count +1), tap again to undo */
+const HEART_ON='<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.14434 10.3422C5.93953 10.3422 5.73472 10.2398 5.58112 10.1374C3.17461 8.3453 1.53613 6.86043 1.53613 4.91474C1.53613 3.53228 2.61138 2.45703 3.94264 2.45703C4.81308 2.45703 5.63232 2.91785 6.14434 3.63468C6.65637 2.91785 7.4756 2.45703 8.34604 2.45703C9.6773 2.45703 10.7526 3.53228 10.7526 4.91474C10.7526 6.86043 9.11408 8.3453 6.70757 10.1374C6.55396 10.2398 6.34915 10.3422 6.14434 10.3422Z" fill="#FF2442"/></svg>';
+/* one like animation for hearts and the 「有用」 bulb.
+   o: the icon node (figma box), on: liking or undoing, svg: icon to show after, col: ring colour, dx: x nudge for the new icon, sparks: three light sparks (bulb) */
+function likeAnim(o,{on=true,svg,col='#FF2442',dx=0,sparks=false,count}){const H=o._el;H.classList.remove('likepop','unpop','heartpress');
+  H.style.transition=`transform ${on?.2:.12}s cubic-bezier(.4,0,1,1)`;H.style.transform='scale(0)';
+  setTimeout(()=>{H.style.transition='none';H.style.transform='';H.innerHTML=svg;H.style.left=px(o.x+dx);const sv=H.firstChild;sv.setAttribute('width',(o.w*K).toFixed(2));sv.setAttribute('height',(o.h*K).toFixed(2));
+    void H.offsetWidth;H.classList.add(on?'likepop':'unpop');
+    if(on){const cx=o.x+dx+o.w/2,cy=o.y+o.h/2,d=o.w*1.05,par=H.parentNode;
+      const ring=document.createElement('div');ring.className='n burst-ring';ring.style.cssText=`left:${px(cx-d/2)};top:${px(cy-d/2)};width:${px(d)};height:${px(d)};border:${px(.85)} solid ${col}`;par.appendChild(ring);
+      if(sparks)[-50,0,50].forEach(a=>{const e=document.createElement('div');e.className='n spark';e.style.cssText=`left:${px(cx-.65)};top:${px(cy-1.6)};width:${px(1.3)};height:${px(3.2)};background:${col};--a:${a}deg;--r:${px(-11)};animation-delay:90ms`;par.appendChild(e);});
+      setTimeout(()=>par.querySelectorAll('.burst-ring,.spark').forEach(e=>e.remove()),700);}
+    if(count)setTimeout(count,on?230:0);
+  },on?200:120);}
+function autoLikes(tree,layerFrom){
+  tree.c.forEach((o,i)=>{if(o._skip||!o._el||o.n!=='ic/c-heart'||o._nolike)return;if(layerFrom>=0&&i<layerFrom)return;if(o._ax<195||o._ax>212||o._ay>495)return;
+    const cnt=tree.c.find(k=>k.tx&&!k._skip&&k._el&&/^\d+$/.test(txt(k))&&Math.abs(k._ax-218.61)<2&&Math.abs(k._ay-o._ay-0.97)<2);
+    const off=o._el.innerHTML,base=cnt?+txt(cnt):0;let on=false,cel=cnt&&cnt._el;
+    hot(o,()=>{on=!on;likeAnim(o,{on,svg:on?HEART_ON:off,count:()=>{const n=base+(on?1:0);
+        if(!cel&&n){const c={t:'TE',x:218.61,y:o.y+0.97,w:5,h:10,n:'cnt',tx:[[String(n),8.41,'Noto Sans SC','Regular','#666666',0,0]],al:'L',va:'T',ar:'W'};cel=node(c);o._el.parentNode.appendChild(cel);fixMetrics();}
+        if(cel)cel.firstChild.textContent=n?String(n):'';}});},{pad:6,label:'赞'});});}
+/* back from a pushed page: reverse of the push (page slides out to the right, previous page returns from the left) */
+let PREV=null;
+function back(after){const prev=PREV,cur=CUR;if(!prev)return after&&after();PREV=null;const EASE='cubic-bezier(.32,.72,0,1)';
+  const shade=prev.querySelector(':scope > .pshade');
+  // re-inserting restarts CSS animations: drop the one-off entrance classes so nothing replays
+  prev.querySelectorAll('.locflash,.makeroom,.newitem,.pop,.fadein,.likepop,.unpop,.dimfade,.slideup').forEach(e=>e.classList.remove('locflash','makeroom','newitem','pop','fadein','likepop','unpop','dimfade','slideup'));prev.style.transition='none';prev.style.transform='translateX(-30%)';
+  screen.insertBefore(prev,cur);void prev.offsetWidth;CUR=prev;
+  requestAnimationFrame(()=>{prev.style.transition=cur.style.transition=`transform .36s ${EASE}`;prev.style.transform='none';cur.style.transform='translateX(100%)';if(shade){shade.style.opacity=0;}});
+  prev.style.pointerEvents='';
+  setTimeout(()=>{cur.remove();shade&&shade.remove();prev.style.boxShadow='';after&&after();},380);}
+
+/* image ids from export (see screens.js); avatars used by banners */
+const AV={a516:'i19',deer:'i1'};
+
+/* ---------- paths ---------- */
+const PATHS={
+  A:{name:'找得到',who:'卡住了，想找做过的人怎么说',steps:['01 搜索：按晒过人数排','02 评论区顶部「大家晒的」','03 展开「大家晒的」，按类型筛','04 翻到底没找到，去搜']},
+  B:{name:'等得到',who:'想问一句，又不想一直守着',steps:['05 看图有问答，打字提示相似提问','06 点「蹲」，等回答','07 有人答了，通知直达']},
+  C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 长按爱心选「有用」','11 收到「有用」与击掌']},
+  D:{name:'边界情况',who:'人少、不想被收、没匹配、图不实',steps:['12 晒的人很少：入口分级','13 不想被收进去：长按移出','14 没找到相似提问：不提示','15 晒的图不是真做的：举报']},
+};
+let path='A',step=0;
+let RAIL_PATH=null;
+const SPRING='cubic-bezier(.32,.72,0,1)'; // critically damped feel, no overshoot (guide UI, not a flick)
+function rail(){
+  const steps=PATHS[path].steps;
+  const build=()=>{const body=k=>`<div class="pbody"><div class="pin"><ol class="steps">${PATHS[k].steps.map((t,i)=>`<li><button class="stepbtn" data-p="${k}" data-i="${i}">${t}</button></li>`).join('')}<li class="fin" hidden>走完了</li></ol></div></div>`;
+    const rng=k=>{const n=PATHS[k].steps.map(t=>t.slice(0,2));return `${n[0]}–${n[n.length-1]}`;};
+    $('#paths').innerHTML=Object.keys(PATHS).map(k=>`<section class="path" data-k="${k}"><button class="pathbtn" data-p="${k}"><span><b>${PATHS[k].name}</b><span>${PATHS[k].who}</span></span><span class="rng">${rng(k)}</span></button>${body(k)}</section>`).join('')
+      +`<div class="cur" id="cur" aria-live="polite"><span id="tiptext"></span><span class="note" id="tipnote"></span><div class="acts" id="tacts"></div><div class="ctl" id="tctl"></div></div>`;};
+  if(!$('#cur'))build();
+  const open=path,changed=RAIL_PATH!==open;RAIL_PATH=open;
+  // accordion: the open path grows to its content height, the others fold — animated from their current height
+  document.querySelectorAll('.path').forEach(sec=>{const k=sec.dataset.k,on=k===open,pb=sec.querySelector('.pbody'),btn=sec.querySelector('.pathbtn');
+    sec.classList.toggle('on',on);btn.setAttribute('aria-current',on);btn.setAttribute('aria-expanded',on);
+    const from=pb.getBoundingClientRect().height;
+    if(on){const li=[...sec.querySelectorAll('.steps li')];li.forEach((el,i)=>{el.className=i<steps.length?(i<step?'done':i===step?'now':''):'fin';if(i===steps.length)el.hidden=step<steps.length;});
+      const host=step>=steps.length?li[steps.length]:li[step];const cur=$('#cur');
+      if(cur.parentNode!==host){const was=cur.parentNode&&cur.parentNode!==$('#paths');host.appendChild(cur);cur.classList.remove('in');void cur.offsetWidth;cur.classList.add('in');}}
+    const to=on?pb.firstElementChild.getBoundingClientRect().height:0;
+    if(Math.abs(from-to)>.5){pb.style.transition='none';pb.style.height=from+'px';void pb.offsetHeight;pb.style.transition=`height .38s ${SPRING}`;pb.style.height=to+'px';
+      clearTimeout(pb._t);pb._t=setTimeout(()=>{if(sec.classList.contains('on'))pb.style.height='auto';},400);}
+    else pb.style.height=on?'auto':'0px';});
+  $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';mmsg();
+  const ah=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}" ${a.sel?'aria-pressed="true"':''}>${a.label}</button>`).join('');$('#tacts').innerHTML=ah;$('#macts').innerHTML=ah;$('#mbar').classList.toggle('has-acts',ACTS.length>0);
+  document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>ACTS[+b.dataset.a].fn());
+  // every step: replay it, or skip to the next one
+  const RE='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+  $('#tctl').innerHTML=step<steps.length?`<button id="replay">${RE}再来一遍</button>`:'';
+  const KS=Object.keys(PATHS),nk=KS[(KS.indexOf(path)+1)%KS.length],end=step>=steps.length,lastPath=nk===KS[0];
+  $('#mctl').innerHTML=`<button id="mreplay">${RE}${end?'重来这一段':'重来'}</button><button class="next" id="mnext">${end?(lastPath?'从头再来':'下一段：'+PATHS[nk].name):'下一步'} ›</button>`;
+  $('#mreplay').onclick=()=>end?start(path):jump(path,step);$('#mnext').onclick=()=>end?start(nk):step<steps.length-1?jump(path,step+1):endCard();
+  if(!end)$('#replay').onclick=()=>jump(path,step); // desktop: the step list right below is the way forward, so only replay here
+  if(end)$('#macts').innerHTML='';
+  // progress across all 15 steps
+  const before=KS.slice(0,KS.indexOf(path)).reduce((n,k)=>n+PATHS[k].steps.length,0),total=KS.reduce((n,k)=>n+PATHS[k].steps.length,0),cur=before+Math.min(step+1,steps.length);
+  const CH=d=>`<svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="${d?'M1.5 1.5L5.5 6l-4 4.5':'M5.5 1.5L1.5 6l4 4.5'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // progress is the bar below; the header only switches step, both ways
+  $('#mprog').innerHTML=`<b>${PATHS[path].name}</b><span class="pg"><button id="mprev" aria-label="上一步" ${cur<=1&&!end?'disabled':''}>${CH(0)}</button><button id="mfwd" aria-label="下一步" ${end&&lastPath?'disabled':''}>${CH(1)}</button></span>`;
+  // back one: end card -> its last step; first step of a section -> last step of the previous section
+  $('#mprev').onclick=()=>{if(end)return jump(path,steps.length-1);if(step>0)return jump(path,step-1);const pk=KS[KS.indexOf(path)-1];if(pk)jump(pk,PATHS[pk].steps.length-1);};
+  $('#mfwd').onclick=()=>$('#mnext').click();
+  let gi=0;$('#mtrack').innerHTML=KS.map(k=>`<div class="sec" style="flex:${PATHS[k].steps.length}">${PATHS[k].steps.map((t,i)=>{gi++;return `<button class="${gi<=cur?'done':''}" data-k="${k}" data-i="${i}" aria-label="${t}"></button>`;}).join('')}</div>`).join('');
+  $('#mtrack').querySelectorAll('button').forEach(b=>b.onclick=()=>{const k=b.dataset.k,i=+b.dataset.i;if(!(k===path&&i===step))jump(k,i);});
+  $('#mtitle').textContent=end?`「${PATHS[path].name}」走完了`:steps[step].replace(/^\d+ /,'');
+  // keep the hint block's own height change smooth too (text length differs per step)
+}
+document.addEventListener('click',e=>{const sb=e.target.closest('.stepbtn,[data-si]');if(sb){const m=$('.msheet');m&&m.remove();const p=sb.dataset.p,i=+(sb.dataset.i??sb.dataset.si);if(!(p===path&&i===step))jump(p,i);return;}const b=e.target.closest('.pathbtn');if(b){const inSheet=!!b.closest('.msheet');const m=$('.msheet');m&&m.remove();if(inSheet||b.dataset.p!==path)start(b.dataset.p);}});
+let TIP='',ACTS=[];const go=(n,tip,acts)=>{step=n;if(tip!=null)TIP=tip;ACTS=(acts||[]).filter(a=>!/^下一个/.test(a.label));note('');rail();};
+let noteT,NOTE='';function mmsg(){const el=$('#mmsg');if(!el)return;el.innerHTML=NOTE?`<span class="mnote">${NOTE}</span>`:(step>=PATHS[path].steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP);}
+function note(msg){clearTimeout(noteT);NOTE=msg;const tn=$('#tipnote');if(tn)tn.textContent=msg;mmsg();if(msg)noteT=setTimeout(()=>note(''),2200);}
+function endCard(){const next={A:'B',B:'C',C:'D',D:'A'}[path];
+  const msg={A:'按晒过的人数挑笔记，在「大家晒的」里按类型筛出经验；楼里没有，再顺手去搜。',B:'提问前先看相似提问；还没人答就「蹲」着，有人回答才通知。',C:'在评论里顺手晒图，被帮到的人点「有用」，消息里能看到帮到了谁。',D:'人少时入口不硬凑；晒的人自己能移出、限制可见；没匹配就不打扰；不实的晒图走举报。'}[path];
+  step=PATHS[path].steps.length;TIP=`路径 ${path} 走完了：${msg}`;ACTS=[{label:'重来一遍',fn:()=>start(path)},{label:`下一段：${PATHS[next].name}`,pri:1,fn:()=>start(next)}];note('');rail();}
+const idxOf=(t,o)=>t.c.indexOf(o);
+const overlayIdx=(t,nth=0)=>{let n=0;for(let i=0;i<t.c.length;i++){const o=t.c[i];if(o.w>=259&&o.h>=565&&o.f&&o.f[0].c&&o.f[0].c.startsWith('rgba(0,0,0')){if(n++===nth)return i;}}return -1;};
+/* figma z-order fix: background bits listed after the overlay (e.g. sort icon) go back under it */
+function sinkAboveOverlay(t,oi){const sink=t.c.filter((o,i)=>i>oi&&(o.n==='ic/sort'));sink.forEach(o=>{t.c.splice(t.c.indexOf(o),1);t.c.splice(oi,0,o);});}
+
+/* A1 search */
+/* search header, matched to the app (same values written into Figma):
+   bar = white with a 1 device-px hairline and a very soft shadow; dividers 1 device px, light; 全部 Medium #222, other tabs #555;
+   filter icon = three centred lines #7b7b7b; 点点 icon 8.85; chips all #ececec, the selected one only darker text (no bold) */
+const FILTER_SVG='<svg width="8.6" height="5.75" viewBox="0 0 8.6 5.75"><rect x="0" y="0" width="8.6" height=".65" rx=".325" fill="#7b7b7b"/><rect x="1.05" y="2.55" width="6.5" height=".65" rx=".325" fill="#7b7b7b"/><rect x="2.35" y="5.1" width="3.9" height=".65" rx=".325" fill="#7b7b7b"/></svg>';
+function polishSearch(t){const C=t.c,T=s=>C.find(o=>o.tx&&txt(o)===s);const cp=o=>JSON.parse(JSON.stringify(o,(k,v)=>k[0]==='_'?undefined:v));
+  const bar=C.find(o=>o.t==='RE'&&Math.abs(o.w-220.42)<.5);bar.r=10.1;bar.s=['#e6e6e6',.25,'I',0];bar.fx=[{k:'D',x:0,y:.8,b:3,sp:0,c:'rgba(0,0,0,0.03)'}];
+  const d1=C.find(o=>o.n==='divider'&&o.y<60);Object.assign(d1,{x:212.1,y:52.8,w:.25,h:7.8,f:[{c:'#e7e7e7'}]});
+  const d2=C.find(o=>o.n==='divider'&&o.y>75&&o.y<90);Object.assign(d2,{x:202.36,y:82.35,w:.25,h:9.5,f:[{c:'#dedede'}]});
+  const all=T('全部');all.tx[0][3]='Medium';all.tx[0][4]='#222222';
+  ['用户','商品','图片','视频'].forEach(s=>T(s).tx[0][4]='#555555');
+  const v=T('视频');['地点','群聊'].forEach((s,i)=>{const c=cp(v);c.tx[0][0]=s;c.x=v.x+36.26*(i+1);c._tab=1;C.push(c);});
+  const f=C.find(o=>o.n==='ic/filter');Object.assign(f,{x:34.2,y:84.3,w:8.6,h:5.75,svgx:FILTER_SVG,fit:1});
+  const dd=C.find(o=>o.n==='点点 icon');const k=8.85/10.66;dd.r=dd.r.map(r=>r*k);Object.assign(dd,{x:208.7,y:81.9,w:8.85,h:8.85});
+  ['综合','最新','最多人晒','村驴版','经典配方'].forEach(s=>{const x=T(s);const b=C[C.indexOf(x)-1];b.f=[{c:'#ececec'}];x.tx[0][3]='Regular';x.tx[0][4]='#777777';b._chip=x._chip=1;});
+  const lt=T('经典配方'),lb=C[C.indexOf(lt)-1];let x=lb.x+lb.w+4.52;
+  [['高压锅',37.64],['家常做法',46.29],['简单',28.85]].forEach(([s,w])=>{const b=cp(lb),c=cp(lt);b.x=x;b.w=w;c.x=x+4.96;c.tx[0][0]=s;b._chip=c._chip=1;C.push(b,c);x+=w+4.52;});
+  [all,...['用户','商品','图片','视频'].map(T),f,C.find(o=>o.t==='RE'&&o.f&&o.f[0].c==='#ff2442'&&o.h<2)].forEach(o=>o._tab=1);
+  // cards: small radius as in the app (≈2.15, measured), image keeps the top corners only
+  C.forEach(o=>{if(o.n==='card')o.r=2.15;else if(o.f&&o.f.some(f=>f.img)&&Math.abs(o.w-124.95)<.5)o.r=[2.15,2.15,0,0];});
+  walk(t,()=>{});}
+let S01_TOP=0;
+function s01(o={}){if(!o.anim)S01_TOP=0;go(0,o.sorted?'点左上角 86 人晒过的这篇':'点「最多人晒」，按晒过的人数排');const t=clone('s01');walk(t,()=>{});
+  // counts belong to the notes; 综合 keeps Figma's original order, 最多人晒 swaps the columns so 86 comes first
+  const cards0=find(t,o=>o.n==='card').sort((a,b)=>a._ay-b._ay||a._ax-b._ax);
+  const inCard=o=>cards0.findIndex(c=>o._ax>=c._ax&&o._ax<c._ax+c.w&&o._ay>=c._ay&&o._ay<c._ay+c.h);
+  find(t,o=>o.n==='晒过人数').forEach(o=>setText(o,['12','86','9','5','3','2'][inCard(o)]+' 人晒过'));
+  const au=byText(t,'今天吃饭了吗')[0];setText(au,'阿紫在做饭');
+  const auAv=t.c.find(o=>o.t==='EL'&&o.w>15&&Math.abs(o._ay-au._ay)<4&&o._ax<au._ax);if(auAv)auAv.f=[{img:'i20'}];
+  polishSearch(t);
+  const chip=(l,on)=>{const tx=byText(t,l)[0];const bgr=t.c[t.c.indexOf(tx)-1];bgr.f=[{c:'#ececec'}];tx.tx[0][3]='Regular';tx.tx[0][4]=on?'#222222':'#777777';return [bgr,tx];};
+  const [zb,zt]=chip('综合',true),[mb,mt]=chip('最多人晒',false);
+  const moving=t.c.filter(o=>o._ay>=130&&o.w<255);moving.forEach(o=>{o._ox=o.x;o._tx=o.x<130?o.x+128.34:o.x-128.34;});
+  const ours=cards0[1];let sorted=!!o.sorted;const hs=[];
+  if(sorted){moving.forEach(m=>m.x=m._tx);chip('综合',false);chip('最多人晒',true);}
+  // the last row sits below the Figma frame, so its heart icons were not exported: same icon, same offset to the count
+  const hv=t.c.find(o=>o.n==='ic/c-heart'&&o.y>515&&o.y<516);[[92.69,701.53],[229.81,726.87]].forEach(([x,y])=>{const c=JSON.parse(JSON.stringify(hv,(k,v)=>k[0]==='_'?undefined:v));c.x=x;c.y=y;c._ox=x;c._tx=x<130?x+128.34:x-128.34;if(sorted)c.x=c._tx;moving.push(c);t.c.push(c);});
+  walk(t,()=>{});render(t,Object.assign(o.anim?{anim:o.anim}:{},{scroll:{top:125,pad:8},hs:[{x:0,y:76,w:202.36,h:22,fade:[170,.1],pick:c=>c._tab},{x:0,y:103,w:260,h:19,pad:9.66,pick:c=>c._chip}]}));
+  ['用户','商品','图片','视频','地点','群聊','问点点'].forEach(s=>{const o=byText(t,s)[0];if(o)hot(o,()=>note('Demo 里只做了「全部」这一栏'),{pad:5,label:s});});const SC=t._sc;try{SC.scrollTop=S01_TOP||0;}catch(e){}SC.addEventListener('scroll',()=>S01_TOP=SC.scrollTop);
+  const tipFor=()=>sorted?'点左上角 86 人晒过的这篇':'点「最多人晒」，按晒过的人数排';
+  const bind=()=>{hs.forEach(h=>h.remove());hs.length=0;walk(t,()=>{});
+    cards0.forEach(c=>hs.push(c===ours?hot(c,()=>s02A({anim:'expand',from:{x:c.x,y:Math.max(125,c.y-SC.scrollTop),w:c.w,h:Math.min(c.h,c.y-SC.scrollTop+c.h-125)}}),{pad:0,label:'打开笔记：酥烂入味肥而不腻的台式卤肉饭'})
+      :hot(c,()=>note('Demo 里只做了 86 人晒过的这篇'),{pad:0,label:'其他笔记'})));};
+  bind();
+  // 综合 / 最多人晒 switch freely, each with the chip spinner, then the results reload in that order
+  const set=(n,on)=>{const [b,x]=n;const sp=x._el.firstChild;sp.style.color=on?'#222222':'#777777';};
+  const sw=(toSorted)=>{if(sorted===toSorted||BUSY)return;set([zb,zt],!toSorted);set([mb,mt],toSorted);
+    loadingCard(800,()=>{sorted=toSorted;
+      moving.forEach(m=>{const e=m._el;m.x=sorted?m._tx:m._ox;e.style.left=px(m.x);if(m.f&&m.f.some(f=>f.img)){e.classList.remove('imgin');void e.offsetWidth;e.classList.add('imgin');}});
+      bind();go(0,tipFor());});};
+  hot(mt,()=>sw(true),{pad:5,label:'最多人晒'});
+  hot(zt,()=>sw(false),{pad:5,label:'综合'});}
+/* the note page's back arrow: path A goes back to search; B/C start on this note */
+function noteBack(t,fn){const b=t.c.find(o=>o.n==='ic/back');if(b)hotRect(0,40,40,30,fn||(()=>note('这条路径从这篇笔记开始；换路径用切换')),'返回');}
+/* A2 comments */
+/* the post itself sits above the comments (cover, title, steps, tags, date), as on an XHS image note; you can scroll up to it */
+const POST={title:'酥烂入味肥而不腻的台式卤肉饭🍚一口封神',
+  body:'肥而不腻、入口即化，一锅就能搞定！\n1. 五花肉切小丁，小火煸到出油\n2. 红葱头切片，下锅炸到金黄\n3. 倒进砂锅加料，小火炖 40 分钟\n红葱酥最后拌进去，特别香～',
+  tags:'#卤肉饭 #家常菜 #跟着小红书做饭',meta:'09-12 广东'};
+function notePost(t){const add=[];const T=(x,y,w,h,s,fs,wt,c,lh,o={})=>add.push(Object.assign({t:'TE',x,y,w,h,n:'post',tx:[[s,fs,'Noto Sans SC',wt,c,lh,0]],al:'L',va:'T',ar:'H'},o));
+  const ih=260*4/3;add.push({t:'RE',x:0,y:0,w:260,h:ih,n:'post cover',f:[{img:'i2'}]});
+  // photo counter and dots, same as Figma 07-3 (230 wide there, x1.1304 here)
+  add.push({t:'RE',x:227.01,y:7.77,w:25.22,h:15.52,n:'post count',f:[{c:'rgba(0,0,0,0.45)'}],r:7.76});T(227.01,7.77,25.22,15.52,'1/4',7.76,'Medium','#ffffff',0,{al:'C',ar:'F',lt:1,n:'post count t'});
+  [0,1,2,3].forEach(i=>add.push({t:'EL',x:130+(i-1.5)*5.82-1.615,y:ih+7.77,w:3.23,h:3.23,n:'post dot',f:[{c:i?'#d9d9d9':'#ff2442'}],r:999}));
+  /* text block measured from a real note (iOS screenshot, 402pt wide -> 260 here), placed by where the ink lands:
+     title semibold; body 10.2 on a 16.81 line, the hashtags run on at the end of the body in #13366B;
+     date row with the 「不喜欢」 pill on the right; a light full-bleed-minus-5 divider; then 共 N 条评论 */
+  const ink=(fs,L)=>(L-1.448*fs)/2+INKC*fs; // box top -> top of the ideographs' ink
+  const T0=ih+17+ink(11.5,15.5);
+  T(10.35,T0-ink(11.6,15.5),239.3,15.5,POST.title,11.6,'Semi Bold','#333333',15.5);
+  const BW=239.3,lines=POST.body.split('\n');let n=0;lines.forEach((l,i)=>{n+=Math.max(1,Math.ceil(textW(l+(i===lines.length-1?' '+POST.tags:''),10.2,'Noto Sans SC',400)/BW-.02));});
+  const B1=T0+20.70;add.push({t:'TE',x:10.35,y:B1-ink(10.2,16.81),w:BW,h:n*16.81,n:'post body',tx:[[POST.body+' ',10.2,'Noto Sans SC','Regular','#333333',16.81,0],[POST.tags,10.2,'Noto Sans SC','Regular','#13366b',16.81,0]],al:'L',va:'T',ar:'H'});
+  const M=B1+(n-1)*16.81+21.99;
+  T(10.35,M-ink(7.77,10),120,10,POST.meta,7.77,'Regular','#8c8c8c',10,{ar:'W'});
+  add.push({t:'RE',x:210.6,y:M-3.09,w:38.8,h:13.85,n:'post dislike',r:6.93,s:['#ebebeb',.25,'I']});
+  add.push({t:'FR',x:213.11,y:M+3.84-4.9,w:9.79,h:9.79,n:'post dislike ic',svg:'v19',svgx:SVGS.v19.replace(/#8C8C8C/g,'#333333').replace(/0\.819237/g,'0.9'),fit:1});
+  T(223.6,M+.72-ink(7,10),24,10,'不喜欢',7,'Regular','#333333',10,{ar:'W'});
+  const y=M+17.18;add.push({t:'RE',x:5.2,y,w:249.6,h:.22,n:'post divider',f:[{c:'#e6e6e6'}]});const D=y+.22+HDR_GAP;
+  add.forEach(o=>{o.y+=75-D;o._inScroll=1;});t.c.splice(8,0,...add);return D;}
+let NOTE_TOP=null;let INKC=.30,HDR_GAP=6.05;
+/* the note's photos swipe sideways like the app: the photo follows the finger 1:1, a flick goes to the next one,
+   the ends rubber-band; mouse drag and trackpad swipe work too. Photo 2 is step 2 of the recipe (Figma 07-3):
+   the step label sits top-left and, at the bottom, how many people asked about this step — tap it to see their questions. */
+// cover + the three steps of the recipe, each photo matching its step
+const SLIDES=[{img:'i2'},{img:'step1',step:'第 1 步 · 煸五花肉'},{img:'step2',step:'第 2 步 · 炸红葱头',qa:[['红葱头要炸到什么程度？','炸到浅金黄就关火捞出，余温还会再上色，炸深了会发苦。','516'],['炸红葱的油怎么用？','炸完捞出来，油留着炒肉，特别香。','阿紫在做饭']]},{img:'step3',step:'第 3 步 · 砂锅小火炖'}];
+let NOTE_SLIDE=0,ON_SLIDE=null,ON_ASK=null;
+/* 大家问的 (Figma 07-3): on a step photo that has answered questions, a small frosted tag sits bottom-left, level with the step label.
+   Tap it and the same tag grows in place into one frosted bubble with up to two question + quoted answer pairs (nickname bottom-right).
+   The bubble is only for reading; tapping anywhere else, swiping to another photo or scrolling the note folds it back. */
+const QA_ICON='<svg viewBox="0 0 23 23" width="100%" height="100%"><path d="M9.37 20.28A9.4 9.4 0 1 0 4.6 17.24L2.9 20.9Z" fill="#fff"/></svg>';
+let QA_OPEN=false;
+function qaHint(d,qa,me,sc){const k=260/230,M=6.87*k,H=13.73*k,R=6.87*k,fs=6.87*k,wB=146*k;
+  const pw=4.8*k+6.6*k+2.6*k+textW('大家问的',fs,'Noto Sans SC',500)+5.6*k;
+  const b=document.createElement('button');b.className='n qa hide still';b.setAttribute('aria-label','大家问的');
+  b.style.cssText=`left:${px(M)};bottom:${px(M)};width:${px(pw)};height:${px(H)};border-radius:${px(R)};-webkit-backdrop-filter:blur(${px(8*k)});backdrop-filter:blur(${px(8*k)});box-shadow:inset 0 0 0 ${px(.4*k)} rgba(255,255,255,.14)`;
+  const grp=qa.map(([q,a,by],j)=>`${j?`<div style="height:${px(5.4*k)}"></div><div style="height:${px(.4*k)};background:rgba(255,255,255,.16)"></div><div style="height:${px(5*k)}"></div>`:''}
+    <div style="font-size:${px(fs)};line-height:${px(9.6*k)};font-weight:500">${q}</div><div style="height:${px(2.4*k)}"></div>
+    <div style="font-size:${px(6.4*k)};line-height:${px(9.2*k)};opacity:.82">“${a}”</div>
+    <div style="font-size:${px(5.7*k)};line-height:${px(8*k)};opacity:.55;text-align:right">— ${by}</div>`).join('');
+  b.innerHTML=`<span class="qa-pill" style="height:${px(H)};padding:0 ${px(5.6*k)} 0 ${px(4.8*k)};gap:${px(2.6*k)};font-size:${px(fs)}"><span style="width:${px(6.6*k)};height:${px(6.6*k)};display:block">${QA_ICON}</span>大家问的</span>
+    <div class="qa-body" style="width:${px(wB)};padding:${px(6.2*k)} ${px(7*k)} ${px(5.6*k)};box-sizing:border-box">${grp}</div>`;
+  d.appendChild(b);const body=b.querySelector('.qa-body');let hB=0,on=false;
+  // a tap outside only folds the bubble; that tap does nothing else
+  const outside=e=>{if(b.contains(e.target))return;close();document.addEventListener('click',ev=>{ev.stopPropagation();ev.preventDefault();},{capture:true,once:true});};
+  const open=()=>{if(on)return;on=true;QA_OPEN=true;hB=body.offsetHeight/K;b.classList.remove('still');b.classList.add('open');b.style.width=px(wB);b.style.height=px(hB);b.style.borderRadius=px(8*k);
+    setTimeout(()=>document.addEventListener('pointerdown',outside,true),0);sc&&sc.addEventListener('scroll',close,{once:true});ON_SLIDE&&ON_SLIDE(me);};
+  const close=(still)=>{if(!on)return;on=false;QA_OPEN=false;document.removeEventListener('pointerdown',outside,true);b.classList.toggle('still',still===true);b.classList.remove('open');b.style.width=px(pw);b.style.height=px(H);b.style.borderRadius=px(R);ON_SLIDE&&ON_SLIDE(me);};
+  b.onclick=e=>{e.stopPropagation();if(!on)open();};
+  return {slide(i){if(i===me){b.classList.remove('still');requestAnimationFrame(()=>requestAnimationFrame(()=>b.classList.remove('hide')));}
+    else{close(true);b.classList.add('still','hide');}}};}
+const rub=(o,d)=>(o*d*.55)/(d+.55*Math.abs(o));
+function pillNodes(x,y,label,op,w){w=w||textW(label,7.76,'Noto Sans SC',500)+12.94;
+  return [{t:'RE',x,y,w,h:15.52,n:'pill',f:[{c:`rgba(0,0,0,${op})`}],r:7.76},{t:'TE',x,y,w,h:15.52,n:'pill t',tx:[[label,7.76,'Noto Sans SC','Medium','#ffffff',0,0]],al:'C',ar:'F',lt:1}];}
+function carousel(t,sc){QA_OPEN=false;const cov=t.c.find(o=>o.n==='post cover');if(!cov||!cov._el)return;const box=cov._el,N=SLIDES.length,Hh=cov.h;
+  box.style.background='#f2f2f2';box.style.overflow='hidden';box.style.touchAction='pan-y';
+  const track=document.createElement('div');track.className='n';track.style.cssText=`left:0;top:0;width:${px(FW*N)};height:${px(Hh)};will-change:transform`;box.appendChild(track);
+  let moved=false;
+  const asks=[];SLIDES.forEach((sl,i)=>{const d=document.createElement('div');d.className='n';d.style.cssText=`left:${px(FW*i)};top:0;width:${px(FW)};height:${px(Hh)};background:url(img/${sl.img}.jpg) center/cover no-repeat`;track.appendChild(d);
+    if(sl.step)pillNodes(7.77,7.77,sl.step,.45).forEach(o=>d.appendChild(node(o)));
+    if(sl.qa)asks.push(qaHint(d,sl.qa,i,sc));});
+  const cnt=t.c.find(o=>o.n==='post count t'),dots=t.c.filter(o=>o.n==='post dot');
+  let idx=Math.min(NOTE_SLIDE,N-1);const W=()=>FW*K;
+  const set=(x,tr)=>{track.style.transition=tr?`transform ${tr}`:'none';track.style.transform=`translate3d(${x}px,0,0)`;};
+  const upd=()=>{if(cnt&&cnt._el)cnt._el.firstChild.textContent=`${idx+1}/${N}`;dots.forEach((o,i)=>o._el&&(o._el.style.background=i===idx?'#ff2442':'#d9d9d9'));};
+  const to=(i,v=0)=>{const prev=idx;idx=Math.max(0,Math.min(N-1,i));NOTE_SLIDE=idx;
+    // critically damped settle; a faster flick settles a little sooner
+    const dur=Math.max(.26,Math.min(.42,.42-Math.abs(v)*.08));set(-idx*W(),`${dur.toFixed(2)}s cubic-bezier(.25,.9,.3,1)`);upd();asks.forEach(a=>a.slide(idx));if(prev!==idx&&ON_SLIDE)ON_SLIDE(idx);};
+  set(-idx*W());upd();asks.forEach(a=>a.slide(idx));
+  let x0=0,y0=0,base=0,mode=null,pid=null,hist=[],st=0;
+  const cur=()=>new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
+  const off=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',end);removeEventListener('pointercancel',cancel);};
+  box.addEventListener('pointerdown',e=>{if(e.button!==0||pid!=null)return;pid=e.pointerId;x0=e.clientX;y0=e.clientY;mode=null;moved=false;
+    base=cur();set(base);hist=[[performance.now(),e.clientX]];st=sc?sc.scrollTop:0; // grab it mid-flight: start from where it is on screen
+    addEventListener('pointermove',mv);addEventListener('pointerup',end);addEventListener('pointercancel',cancel);});
+  const mv=e=>{if(e.pointerId!==pid)return;const dx=e.clientX-x0,dy=e.clientY-y0;
+    if(!mode){if(Math.hypot(dx,dy)<7)return;mode=Math.abs(dx)>Math.abs(dy)?'x':'y';
+      if(mode==='x'){moved=true;try{box.setPointerCapture(pid);}catch(_){}if(sc){sc._lock=true;sc.scrollTop=st;}}
+      else{set(-idx*W(),'.3s cubic-bezier(.25,.9,.3,1)');}}
+    if(mode!=='x')return;const min=-(N-1)*W();let x=base+dx;if(x>0)x=rub(x,W());else if(x<min)x=min-rub(min-x,W());set(x);
+    const now=performance.now();hist.push([now,e.clientX]);while(hist.length>2&&now-hist[0][0]>90)hist.shift();};
+  const cancel=e=>{if(e.pointerId!==pid)return;pid=null;off();if(sc)sc._lock=false;if(mode==='x')to(idx);};
+  const end=e=>{if(e.pointerId!==pid)return;pid=null;off();if(sc)setTimeout(()=>sc._lock=false,0);if(mode!=='x')return;
+    const [a,b]=[hist[0],hist[hist.length-1]];const v=(b[1]-a[1])/Math.max(1,b[0]-a[0]); // px per ms
+    const proj=cur()+v*99; // where the flick is heading (decay .99), then the nearest photo, one at a time
+    let i=Math.round(-proj/W());i=Math.max(idx-1,Math.min(idx+1,i));to(i,v/K);
+    setTimeout(()=>moved=false,0);};
+  box.addEventListener('click',e=>{if(moved){e.stopPropagation();e.preventDefault();}},true);
+  // two-finger swipe on a trackpad
+  let acc=0,wl=false,wt=0;box.addEventListener('wheel',e=>{if(Math.abs(e.deltaX)<=Math.abs(e.deltaY))return;e.preventDefault();clearTimeout(wt);wt=setTimeout(()=>{wl=false;acc=0;},160);
+    if(wl)return;acc+=e.deltaX;if(Math.abs(acc)>24){wl=true;to(idx+(acc>0?1:-1));acc=0;}},{passive:false});
+  fixMetrics();}
+/* glide the note to a y (critically damped, no overshoot) */
+function glide(sc,y,ms=560,done){const s0=sc.scrollTop,d=y-s0,t0=performance.now();sc._lock=true;
+  const f=now=>{const k=Math.min(1,(now-t0)/ms),e=1-(1+6*k)*Math.exp(-6*k);sc.scrollTop=s0+d*(k<1?e/(1-7*Math.exp(-6)):1);if(k<1)requestAnimationFrame(f);else{sc._lock=false;done&&done();}};requestAnimationFrame(f);}
+const noteScroll=(t,o={})=>{walk(t,()=>{});let D=0;if(!t._post){D=notePost(t);t._post=D;walk(t,()=>{});}else D=t._post;
+  const bi=t.c.findIndex(c=>c.w>=259&&c._ay>500);t.c.forEach((c,i)=>{if(i>=bi&&c._ay>=500)c._fixed=1;});
+  return Object.assign({},o,{scroll:{top:75,bottom:t.c[bi]._ay,pad:10,above:D,note:1}});};
+function s02A(o={}){if(o.anim==='expand')NOTE_TOP=0;go(1,NOTE_TOP===0?'往上滑到评论区，点「大家晒的 86」':'点「大家晒的 86」，看做过的人晒了什么');const t=clone('s02');render(t,noteScroll(t,o));noteBack(t,()=>s01({sorted:true,anim:'pop'}));
+  hotRect(8,132,244,68,()=>sheetA('全部',true),'打开大家晒的');}
+/* A3/A4 sheet: chips really filter; the filtered list ends with the search link from screen 04 */
+const GROUPS={'晒了成品':[155,312],'改了做法':[312,375],'踩过的坑':[375,525]};
+function sheetA(filter,anim){
+  const t=clone('s03');const oi=overlayIdx(t);sinkAboveOverlay(t,oi);walk(t,()=>{});
+  // chip state
+  ['全部','晒了成品','踩过的坑','改了做法'].forEach(c=>{const tx=byText(t,c).pop();const bgr=t.c[t.c.indexOf(tx)-1];const on=c===filter;
+    bgr.f=[{c:on?'#eeeeee':'#f7f7f7'}];tx.tx[0][3]='Regular';tx.tx[0][4]=on?'#333333':'#8c8c8c';});
+  let link=null;
+  if(filter!=='全部'){const [y0,y1]=GROUPS[filter];
+    const list=t.c.filter((o,i)=>i>oi&&o._ay>=155&&o.w<255);
+    const keep=list.filter(o=>o._ay>=y0&&o._ay<y1);list.filter(o=>!keep.includes(o)).forEach(o=>o._skip=1);
+    const top=Math.min(...keep.filter(o=>o.t==='EL').map(o=>o._ay));const dy=160.83-top;keep.forEach(o=>o.y+=dy);
+    const timeRow=keep.filter(o=>o.tx&&/回复$/.test(txt(o))).map(o=>o.y)[0];
+    const s4=clone('s04');
+    const lk2=s4.c.filter(o=>['没找到想要的？','卤肉饭焖多久','- 到底了 -'].includes(txt(o))||(o.svg&&o.y>314&&o.y<316&&o.w<10));
+    const off=timeRow+29.28-313.64;lk2.forEach(o=>{o.y+=off;t.c.push(o);});link=lk2;}
+  render(t,{layerFrom:oi+1,anim:anim?'up':null,dy:FH-97});
+  ['全部','晒了成品','踩过的坑','改了做法'].forEach(c=>{const o=byText(t,c).pop();const bgr=t.c[t.c.indexOf(o)-1];hot(o,()=>{if(c===filter||BUSY)return;
+    // the tapped chip turns on at once, the list reloads behind the loading card
+    ['全部','晒了成品','踩过的坑','改了做法'].forEach(k=>{const x=byText(t,k).pop(),b=t.c[t.c.indexOf(x)-1],on=k===c;b._el.style.background=on?'#eeeeee':'#f7f7f7';const sp=x._el.firstChild;sp.style.color=on?'#333333':'#8c8c8c';});
+    loadingCard(600,()=>sheetA(c,false));},{pad:7});});
+  hot(find(t,o=>o.n==='ic/close')[0],()=>s02A({anim:'dismiss',dy:FH-97}),{label:'关闭'});hotRect(0,0,260,96,()=>s02A({anim:'dismiss',dy:FH-97}),'关闭大家晒的');
+  if(link){go(3,'楼里没找到想要的，点「卤肉饭焖多久」去搜');walk(t,()=>{});
+    const q=link.find(o=>txt(o)==='没找到想要的？'),kw=link.find(o=>txt(o)==='卤肉饭焖多久');
+    hotRect(q._ax-4,q._ay-6,kw._ax+kw.w-q._ax+8,kw.h+12,()=>endCard(),'去搜索：卤肉饭焖多久');}
+  else go(2,'点上面的类型筛一筛，比如「踩过的坑」');}
+
+/* B5 input with hint */
+const tipB=i=>i===2?(QA_OPEN?'这是做过的人的问和答，点旁边就收起。没有你想问的？点底部的评论框，直接问':'左下角有「大家问的」，点开看看做过的人怎么说'):(document.documentElement.classList.contains('m')?'左右滑动图片，':'左右滑动图片（鼠标可以拖），')+'翻到第 2 步「炸红葱头」';
+function s02B(o={}){if(!o.anim)NOTE_TOP=0;go(0,tipB(NOTE_SLIDE));const t=clone('s02');render(t,noteScroll(t,o));noteBack(t);hotRect(40,97,212,28,()=>s05(),'评论输入框');hotRect(9,512,100,26,()=>s05(),'说点什么');
+  ON_SLIDE=i=>go(0,tipB(i));}
+function s05(again){go(0,again?'点输入框上方的「3 人问过…先看看」':'正在输入…');const t=clone('s05');const oi=t.c.findIndex(o=>o.n==='遮罩');
+  const q=byText(t,'没有红葱头，用洋葱代替可以吗')[0];const full=txt(q);if(!again)setText(q,'');
+  const caret=t.c.find(o=>o.n==='Rectangle'&&o.f&&o.f[0].c==='#ff2442'&&o.w<2);
+  const hint=find(t,o=>o.n==='原位提示 · 头像版')[0];const send=t.c.find(o=>o.n==='发送按钮');
+  // no reserved row: the panel starts without the hint and grows upward when a match is found
+  const panel=t.c.find(o=>o.n==='评论输入面板');const grow=250.96-230.04;const py=panel.y,ph=panel.h;
+  if(!again){hint.op=0;panel.y+=grow;panel.h-=grow;}
+  render(t,{layerFrom:oi,anim:'up',dy:FH-220,over:true});
+  caret._el.classList.add('caret');
+  const ready=()=>{go(0,'点输入框上方的「3 人问过…先看看」；直接点「发送」也可以');hot(hint,()=>s06(),{pad:5,label:'3 人问过，先看看'});
+    hot(send,()=>s02Posted(full),{pad:4,label:'发送'});};
+  if(again){ready();}
+  else{caret._el.style.left=px(q._ax+0.6);const span=q._el.firstChild;let i=0;
+    const tick=()=>{if(i<=full.length){span.textContent=full.slice(0,i);caret._el.style.left=px(q._ax+q._el.offsetWidth/K+0.6);i++;setTimeout(tick,80);}
+      else setTimeout(()=>{const pe=panel._el.style;pe.transition='top .22s cubic-bezier(.2,.8,.2,1),height .22s cubic-bezier(.2,.8,.2,1)';pe.top=px(py);pe.height=px(ph);
+        hint._el.style.transition='opacity .2s .1s';hint._el.style.opacity=1;ready();},500);};
+    setTimeout(tick,420);}
+  hotRect(0,0,260,218,()=>s02B({anim:'dismiss',dy:FH-220}),'收起输入');}
+/* B5b: sent anyway — the question is posted at the top; the user can go back and try the hint */
+function s02Posted(text,after){NOTE_TOP=null;const t=clone('s02');walk(t,()=>{});
+  const H=62.42,Y=212.79;const tpl=t.c.filter(o=>o._ay>=Y-1&&o._ay<Y+45&&o._ax<255&&o.w<255);
+  const me=t.c.find(o=>o.t==='EL'&&Math.abs(o._ay-99.6)<1);
+  const bix=t.c.findIndex(o=>o.w>=259&&o._ay>500);const moved=t.c.filter((o,i)=>i<bix&&o._ay>=Y-1&&o.w<255);moved.forEach(o=>o.y+=H);
+  const add=tpl.map(o=>{const c=JSON.parse(JSON.stringify(o,(k,v)=>k[0]==='_'?undefined:v));c.y-=H;return c;});
+  add.forEach(c=>{if(c.t==='EL')c.f=JSON.parse(JSON.stringify(me.f));if(c.tx){const v=txt(c);
+    if(v==='🥔')c.tx=[['我',...c.tx[0].slice(1)]];else if(/^炸洋葱/.test(v))c.tx=[[text+'？',...c.tx[0].slice(1)]];else if(/回复$/.test(v)){c.tx=[['刚刚 广东   ',...c.tx[0].slice(1)],['回复',...c.tx[1].slice(1)]];}else if(v==='1')c._skip=1;}});
+  const bar=t.c.findIndex(o=>o.w>=259&&o._ay>500);t.c.splice(bar,0,...add);
+  render(t,noteScroll(t,{anim:'dismiss',dy:FH-220}));
+  // as in the app: the input panel drops, rows below make room, the new comment fades in, then the 「评论已发布」 toast
+  add.forEach(o=>o._el&&o._el.classList.add('newitem'));
+  appToast('评论已发布',{delay:120});
+  if(after)return after();
+  go(0,'问题发出去了。也可以回到上一步，点「3 人问过…先看看」，先看大家问过的',[{label:'回到上一步',pri:1,fn:()=>s05(true)}]);}
+/* B6 squat */
+function s06(o={}){go(1,'还没人答，点这条下面的「5 人在蹲」');const t=clone('s06');
+  const tags=t.c.filter(o=>o.n==='Frame'&&o.c&&o.c.some(k=>k.tx&&/人在蹲/.test(txt(k))));
+  const mine=tags.find(o=>/6 人在蹲/.test(txt(o.c[1])));const gray=tags.find(o=>o!==mine);
+  const toastF=t.c.find(o=>o.n.startsWith('Frame 14101255'));toastF._skip=1;
+  const fixTag=g=>{const ic=g.c[0],tt=g.c[1];ic.x=4.52;ic.w=ic.h=9;ic.y=(11.78-9)/2;ic.fit=1;tt.x=16.35;tt.y=3.39;g.h=11.78;g.w=tt.x+textW(txt(tt),tt.tx[0][1],'Noto Sans SC',400)+4.52;};
+  tags.forEach(fixTag);
+  const yellow=JSON.parse(JSON.stringify(mine,(k,v)=>k[0]==="_"?undefined:v));
+  // before tapping: same gray style as the other tag, one fewer person
+  setText(gray.c[1],'3 人在蹲');mine.f=gray.f;mine.c[0].svg=gray.c[0].svg;setText(mine.c[1],'5 人在蹲');mine.c[1].tx[0][4]=gray.c[1].tx[0][4];
+  if(o.img){render(t,noteScroll(t,{anim:'fade'}));}else{NOTE_TOP=null;render(t,noteScroll(t,o.jump?{}:{anim:'dismiss',dy:FH-220}));}
+  const flash=()=>{const rowBg=document.createElement('div');rowBg.className='n locflash';rowBg.style.cssText=`left:0;top:${px(346)};width:${px(FW)};height:${px(70)}`;const inn=CUR._scr?CUR._scr.inner:CUR;inn.insertBefore(rowBg,inn.firstChild);};
+  if(o.img){const sc=CUR.querySelector('.sc');glide(sc,t._post*K,600,flash);}else flash();
+  hot(mine,()=>{const el=node(yellow);el.style.left=px(yellow.x);el.style.top=px(yellow.y);el.classList.add('pop');mine._el.replaceWith(el);
+    const tf=node(toastF);tf.classList.add('fadein');CUR.appendChild(tf);setTimeout(()=>tf.remove(),1800);
+    go(1,'蹲上了，有人回答时会收到通知');setTimeout(()=>{go(2,'过了一会儿，516 回答了你蹲的问题：点顶部的通知');banner(AV.a516,'516','回答了你蹲的问题','可以，用紫洋葱也行，小火慢慢炸别急',s07);},2300);},{pad:6,label:'蹲这个问题'});}
+/* B7 notification */
+function s07(){go(2,'点这条回答直达原评论；点左上角返回也可以');const t=clone('s07');
+  find(t,o=>o.n==='ic/c-heart'&&o._p&&o._p.c&&o._p.c.some(k=>k.tx&&txt(k)==='赞')).forEach(o=>{const pill=o._p;const tt=pill.c.find(k=>k.tx);const cx=o.x+o.w/2,cy=o.y+o.h/2;
+    o.svgx=SVGS[o.svg].replace(/stroke="#8C8C8C"/g,'stroke="#333333"').replace(/stroke-width="[\d.]+"/g,'stroke-width="0.62"');o.w*=1.18;o.h*=1.18;o.fit=1;o.x=cx-o.w/2;o.y=cy-o.h/2;tt.x+=o.w/1.18*0.18;pill.w+=o.w/1.18*0.18;});render(t,{anim:'push'});
+  hotRect(0,80,260,96,()=>endCard(),'打开回答');backBtn(t);pageLoading();
+  // 赞 on the reply: heart turns red, the app shows 点赞成功 / 取消赞成功
+  find(t,o=>o.tx&&txt(o)==='赞').forEach(l=>{const pill=l._p,ic=pill.c.find(k=>k.n==='ic/c-heart');if(!ic)return;const off=ic._el.innerHTML;let on=false;
+    hot(pill,()=>{on=!on;const H=ic._el;H.innerHTML=on?HEART_ON:off;const sv=H.firstChild;sv.setAttribute('width',(ic.w*K).toFixed(2));sv.setAttribute('height',(ic.h*K).toFixed(2));H.classList.remove('unpop');void H.offsetWidth;H.classList.add('unpop');appToast(on?'点赞成功':'取消赞成功',{y:269.59});},{pad:2,label:'赞这条回答'});});}
+/* notification pages: back returns to the page you came from; the path is already complete there */
+function backBtn(t){const b=t.c.find(o=>o.n==='ic/back');hotRect(0,40,44,32,()=>back(()=>endCard()),'返回');}
+
+/* C8 share from sheet */
+function s03C(o={}){go(0,'做完了来晒一下：先点「大家晒的 86」');const t=clone('s02');render(t,noteScroll(t,o));hotRect(8,132,244,68,()=>s03Cs(),'打开大家晒的');noteBack(t);}
+function s03Cs(o={anim:'up'}){go(0,'点底部的「我也晒一个」');const t=clone('s03');const oi=overlayIdx(t);sinkAboveOverlay(t,oi);
+  // bottom bar with 我也晒一个, same as screen 09
+  const s9=clone('s09');const bar=s9.c.filter(o=>o._ay===undefined&&false);
+  const pick=s9.c.filter(o=>(o.y>=501&&o.y<=509&&o.w>200)||txt(o)==='我也晒一个'||(o.w>80&&o.h<4&&o.y>550));
+  pick.forEach(o=>t.c.push(o));
+  render(t,{layerFrom:oi+1,anim:o.anim,dy:o.anim==='dismiss'?FH-207:FH-97});
+  const btn=pick.find(o=>o.f&&o.f[0].c==='#ff2442');hot(btn,()=>s08(),{pad:0,label:'我也晒一个'});
+  const shut=()=>s03C({anim:'dismiss',dy:FH-97});hot(find(t,o=>o.n==='ic/close')[0],shut,{label:'关闭'});hotRect(0,0,260,96,shut,'关闭大家晒的');}
+function s08(){go(0,'正在输入…');const t=clone('s08');const oi=t.c.findIndex(o=>o.n==='遮罩');
+  const q=byText(t,'照着做好了，油留着炒肉真的香')[0];const full=txt(q);setText(q,'');
+  const caret=t.c.find(o=>o.n==='Rectangle'&&o.f&&o.f[0].c==='#ff2442'&&o.w<2);
+  const send=t.c.find(o=>o.n==='发送按钮');send.op=.4;
+  render(t,{layerFrom:oi,anim:'up',dy:FH-207});let gone=false;
+  hotRect(0,0,260,340,()=>{gone=true;s03Cs({anim:'dismiss'});},'收起输入');
+  caret._el.classList.add('caret');caret._el.style.left=px(q._ax+0.6);const span=q._el.firstChild;let i=0;
+  const tick=()=>{if(gone)return;if(i<=full.length){span.textContent=full.slice(0,i);caret._el.style.left=px(q._ax+q._el.offsetWidth/K+0.6);i++;setTimeout(tick,80);}
+    else{send._el.style.transition='opacity .2s';send._el.style.opacity=1;go(0,'点「发送」');hot(send,()=>s09(),{pad:4,label:'发送'});}};
+  setTimeout(tick,420);}
+/* C9 posted, pinned on top */
+function s09(){go(1,'晒好啦，你的图置顶在最上面');const t=clone('s09');const oi=overlayIdx(t);const DISMISS=1;
+  const tbg=t.c.find(o=>o.f&&o.f[0].c==='rgba(0,0,0,0.75)');const ttx=byText(t,'晒好啦')[0];
+  tbg.op=ttx.op=0;
+  render(t,{layerFrom:oi,anim:'dismiss',dy:FH-207});
+  const H=317.56-162.98;const isBar=o=>o.y>=501&&(o.w>200||(o.w>80&&o.h<4));
+  t.c.forEach((o,i)=>{if(i<=oi||!o._el||o===tbg||o===ttx||isBar(o))return;
+    if(o.y>=155&&o.y<310)o._el.classList.add('newitem');});
+  [tbg,ttx].forEach(o=>{o._el.style.transition='opacity .2s';setTimeout(()=>o._el.style.opacity=1,120);setTimeout(()=>o._el.style.opacity=0,1760);});
+  // C10: long-press someone else's heart -> reactions picker (same picker as screen 10)
+  const me=CUR;setTimeout(()=>{if(CUR===me)go(2,'看到 516 晒的也帮到了你：长按它的爱心');},1600);
+  const heart=t.c.find(o=>o.n.startsWith('ic/c-heart')&&o.y>439&&o.y<441);const cnt=t.c.find(o=>txt(o)==='10'&&o.y>440&&o.y<442);
+  // 516's heart shown unliked before the action
+  const plain=t.c.find(o=>o.n==='ic/c-heart'&&o.svg);const R={heart,cnt,kind:null,outline:node(plain).innerHTML,liked:SVGS[heart.svg],first:true};
+  heart._el.innerHTML=R.outline;cnt._el.firstChild.textContent='9';
+  // 516's 课代表 badge (the one on the row above this heart) turns into 关注 once you mark it 「有用」
+  const bdg=t.c.filter(o=>o.n==='badge · 课代表'&&o._el&&o._ay<heart._ay).sort((a,b)=>b._ay-a._ay)[0];
+  if(bdg)R.onKind=k=>followSwap(bdg,k==='bulb');
+  heart._nolike=1;const h=hot(heart,()=>{},{pad:7,label:'长按爱心'});h.style.touchAction='none';holdPicker(h,R);}
+/* filled 「有用」 bulb: same outline as the picker icon, filled the way the liked heart is */
+const BULB_ON=`<svg width="18" height="18" viewBox="1 -0.6 16 16" fill="none"><path d="M8.55014 2.56475C7.65537 2.55416 6.78057 2.82936 6.05302 3.35032C5.32547 3.87127 4.78314 4.6108 4.50495 5.46129C4.22675 6.31177 4.2272 7.22884 4.50624 8.07905C4.78527 8.92927 5.32833 9.66826 6.05639 10.1885C6.48389 10.5447 6.76889 11.0435 6.76889 11.6135V12.1122H10.3314V11.6135C10.3314 11.0435 10.6164 10.5447 11.0439 10.1885C11.7719 9.66826 12.315 8.92927 12.594 8.07905C12.8731 7.22884 12.8735 6.31177 12.5953 5.46129C12.3171 4.6108 11.7748 3.87127 11.0473 3.35032C10.3197 2.82936 9.44491 2.55416 8.55014 2.56475Z" fill="#FFB800" stroke="#FFB800" stroke-width="1.14" stroke-linejoin="round"/><path d="M6.98242 14.25H10.1174" stroke="#FFB800" stroke-width="1.14" stroke-linecap="round"/><path d="M8.54999 9.68969V7.40969M8.54999 7.40969L7.55249 6.55469M8.54999 7.40969L9.54749 6.55469" stroke="#fff" stroke-width="1.14" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/* press and hold -> picker opens; keep holding and slide across to switch, release on one to choose.
+   A quick release leaves the picker open so it can also be tapped. Holding again later lets you switch reactions. */
+function holdPicker(h,R){let tm=null,P=null;const H=R.heart._el;
+  const at=e=>(P?P.items:[]).find(it=>{const r=it.b.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top-6&&e.clientY<=r.bottom+6;});
+  const hover=it=>(P?P.items:[]).forEach(x=>x.ic.classList.toggle('hov',x===it));
+  h.addEventListener('contextmenu',e=>e.preventDefault());
+  h.addEventListener('pointerdown',e=>{e.preventDefault();try{h.setPointerCapture(e.pointerId);}catch(_){}H.classList.add('heartpress');
+    tm=setTimeout(()=>{tm=null;H.classList.remove('heartpress');P=picker(R);P.holding=true;},420);});
+  h.addEventListener('pointermove',e=>{if(P&&P.holding)hover(at(e));});
+  const end=e=>{H.classList.remove('heartpress');if(tm){clearTimeout(tm);tm=null;if(e.type==='pointerup')note(R.kind?'长按可以换一个':'要长按，不是点一下');return;}
+    if(P&&P.holding){P.holding=false;const it=at(e);hover(null);if(it)P.choose(it.o);}};
+  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);}
+function picker(R){const {heart,cnt}=R;if(R.first)go(2,'按住不放，滑到小灯泡上松手，表示「有用」；松手后再点也可以');
+  const s10=clone('s10');const pk=s10.c.find(o=>o.n==='反应选择 · 长按爱心');
+  // same offset to the heart as in screen 10
+  pk.x=heart._ax-(203.73-117.83);pk.y=heart._ay-(350.87-319.51);
+  const el=node(pk);el.style.left=px(pk.x);el.style.top=px(pk.y);el.style.zIndex=50;el.classList.add('pkbox');CUR.appendChild(el);
+  walk(pk,()=>{});const bulb=pk.c.find(o=>o.n==='ic/有用 · 灯泡'),hrt=pk.c.find(o=>o.n==='ic/heart');
+  // icons pop in one after another
+  pk.c.forEach((o,i)=>{if(o._el&&o.svg){o._el.classList.add('pkic');o._el.style.animationDelay=(40+i*35)+'ms';}});
+  const P={holding:false,items:[]};
+  let done=false;const shut=()=>{document.removeEventListener('pointerdown',close,true);el.classList.add('out');setTimeout(()=>el.remove(),160);};
+  const close=e=>{if(!el.contains(e.target)&&!done&&!P.holding){done=true;shut();}};
+  setTimeout(()=>document.addEventListener('pointerdown',close,true),60);
+  P.choose=o=>{if(done)return;const kind=o===bulb?'bulb':o===hrt?'heart':null;
+    if(!kind)return note(R.first?'这一步选小灯泡「有用」':'这个 Demo 里可以在爱心和「有用」之间切换');
+    done=true;shut();react(R,kind);
+    if(kind==='bulb'&&R.first){R.first=false;go(2,'点好了，516 会知道帮到了你；「课代表」旁边多了「关注」，可以顺手关注靠谱的过来人');setTimeout(()=>{go(3,'过了一会儿，有人回应了你晒的图：点顶部的通知');banner(AV.deer,'小鹿','照着你晒的做成了','还有 6 人觉得你晒的有用',s11);},3600);}
+    else if(R.first)note('这一步要选小灯泡「有用」：再长按，换成小灯泡');};
+  pk.c.forEach(o=>{if(!o.svg)return;const b=document.createElement('button');b.className='hot';b.style.cssText=`left:${px(o.x-4)};top:${px(o.y-4)};width:${px(o.w+8)};height:${px(o.h+8)}`;b.setAttribute('aria-label',o.n.replace('ic/',''));el.appendChild(b);
+    const ic=o._el;P.items.push({o,b,ic});
+    b.onpointerenter=()=>{if(!P.holding)ic.classList.add('hov');};b.onpointerleave=()=>ic.classList.remove('hov','press');
+    b.onpointerdown=()=>ic.classList.add('press');b.onpointerup=()=>ic.classList.remove('press');
+    b.onclick=()=>P.choose(o);});
+  return P;}
+/* the reaction lands like the app's like: old icon shrinks away, the filled one springs in with a ring and three sparks, the count rolls */
+const FOL_STAY=4000,FOL_DONE=1200; // 关注 waits a few seconds then fades; 已关注 confirms, then fades
+function followSwap(b,on){const el=b._el;let f=b._fol;
+  const fade=ms=>{clearTimeout(b._h);b._h=setTimeout(()=>f.classList.add('gone'),ms);};
+  if(!f){f=b._fol=document.createElement('button');f.className='fol off';f.setAttribute('aria-label','关注 516');
+    f.style.cssText+=`;left:${px(parseFloat(el.style.left)/K+b.w+3.5)};top:${px(b.y-1)};height:${px(b.h+2)};font-size:${px(6.6)};line-height:${px(b.h+2)}`;
+    f.textContent='关注';el.parentNode.appendChild(f);
+    f.onclick=e=>{e.stopPropagation();if(b._followed)return;b._followed=true;f.textContent='已关注';f.style.color='#999';note('关注了 516，之后能在关注里看到 TA 晒的');fade(FOL_DONE);};}
+  if(b._followed)return; // once followed it is done, whichever reaction you switch to
+  clearTimeout(b._t);clearTimeout(b._h);
+  b._t=setTimeout(()=>{f.classList.remove('gone');f.classList.toggle('off',!on);if(on)fade(FOL_STAY);},on?260:0);} // after the bulb has landed
+function react(R,kind){const {heart,cnt}=R;if(R.kind===kind)return;const had=!!R.kind;R.kind=kind;R.onKind&&R.onKind(kind);
+  likeAnim(heart,kind==='bulb'?{svg:BULB_ON,col:'#FFB800',dx:1.1,sparks:true,count:had?null:()=>cnt._el.firstChild.textContent='10'}:{svg:R.liked,count:had?null:()=>cnt._el.firstChild.textContent='10'});}
+/* C11 notifications */
+function s11(){go(3,'点「击掌」回应小鹿');const t=clone('s11');render(t,{anim:'push'});backBtn(t);pageLoading();
+  const clap=find(t,o=>o.tx&&txt(o)==='击掌')[0];const pill=clap._p;const emo=pill.c.find(k=>k!==clap&&k.tx);
+  // the emoji is drawn wider in the browser than in Figma: keep a real gap after it, and the pill's right padding as in Figma
+  const pad=pill.w-(clap.x+clap.w),GAP=3.2;
+  const lay=(anim)=>{const sp=clap._el.firstChild,cs=getComputedStyle(sp);cv.font=`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const es=emo&&emo._el&&emo._el.firstChild,ew=es?es.getBoundingClientRect().width/K:8;const x=(emo?emo.x:7.91)+ew+GAP;
+    clap._el.style.left=px(x);const nw=px(x+cv.measureText(sp.textContent).width/K+pad);
+    [pill._el,pill._p&&pill._p._el].forEach(e=>{if(e){e.style.transition=anim?'width .2s':'none';e.style.width=nw;}});};
+  lay(false);if(document.fonts)document.fonts.ready.then(()=>{if(clap._el.isConnected)lay(false);});
+  let done=false;hot(pill,()=>{if(done)return;done=true;const sp=clap._el.firstChild;sp.textContent='已击掌';sp.style.color='#999999';lay(true);
+    setTimeout(endCard,500);},{pad:3,label:'击掌'});}
+
+
+/* ---------- D: edge cases (Figma v9-09 边界与异常) ---------- */
+/* D12 the 大家晒的 entry by how many people shared: 0 = one light line, 1–2 = a single row, 3+ = the photo list */
+const TIERS=[['0 人','没人晒过：只留一行「有经验？分享一下 ›」，给第一位分享的人留个位置'],['1–2 人','1–2 人晒过：收成一行，头像加人数，不硬凑图片'],['3 人以上','3 人以上：展开图片列表（路径 A 里看到的就是这种）']];
+function s02D(tier=0,o={}){const t=clone('s02');walk(t,()=>{});
+  const ttl=t.c.find(x=>x.tx&&/^大家晒的 \d+$/.test(txt(x))),more=t.c.find(x=>x.tx&&txt(x)==='查看 ›'&&x._ay<150);
+  const thumbs=t.c.filter(x=>x.t==='RE'&&Math.abs(x._ay-152.64)<.5&&x.h>44&&x.h<45),plus=t.c.find(x=>x.tx&&txt(x)==='+81');
+  if(tier<2){thumbs.forEach(x=>x._skip=1);if(plus)plus._skip=1;const bix=t.c.findIndex(x=>x.w>=259&&x._ay>500);
+    t.c.forEach((x,i)=>{if(i<bix&&x._ay>=200)x.y-=50.31;});
+    const right=more.x+more.w;
+    if(tier===0){ttl.ar='W';setText(ttl,'有经验？');ttl.tx[0][4]='#999999';setText(more,'分享一下 ›');more.tx[0][4]='#ff2442';more.w=textW('分享一下 ›',8.41,'Noto Sans SC',400);more.x=right-more.w;more.ar='W';}
+    else{setText(ttl,'2 人晒过');ttl.x=45.17;ttl.ar='W';const av=(x,img)=>({t:'EL',x,y:134.01,w:14.8,h:14.8,n:'av',f:[{img}],r:999,s:['#ffffff',1.3,'I']});t.c.splice(t.c.indexOf(ttl),0,av(10.38,'i13'),av(19.95,'i14'));}}
+  go(0,TIERS[tier][1],[...TIERS.map(([k],i)=>({label:k,sel:i===tier,fn:()=>{if(i!==tier)s02D(i,{anim:'fade'});}}))]);
+  render(t,noteScroll(t,o));noteBack(t);walk(t,()=>{});
+  const row=[ttl,more];const y=Math.min(...row.map(x=>x._ay))-6;
+  if(tier===0)hotRect(0,y,260,24,()=>note('会打开晒图的输入框，和路径 C 一样'),'分享一下');
+  else if(tier===1)hotRect(0,y,260,24,()=>note('会打开「大家晒的」，这里只有 2 条'),'2 人晒过，查看');
+  else hotRect(8,132,244,68,()=>note('会打开「大家晒的」，和路径 A 一样'),'打开大家晒的');}
+
+/* the app's long-press sheet (Figma 08-5, 248 wide there): grouped white cards on #f5f5f7 over a dim, slides up */
+const MENU_IC={"回复": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M4.48052 9.69946C5.51767 9.97736 6.62003 9.87488 7.58818 9.41056C8.55633 8.94623 9.32632 8.15073 9.75885 7.16797C10.1914 6.1852 10.2579 5.08008 9.94633 4.05254C9.63478 3.025 8.96575 2.1429 8.06027 1.56582C7.15479 0.988743 6.07267 0.754804 5.00968 0.906327C3.94669 1.05785 2.97303 1.58482 2.26486 2.39192C1.55668 3.19901 1.16076 4.23291 1.14872 5.30658C1.13668 6.38025 1.50932 7.42277 2.19922 8.24554L1.38617 9.99598L4.48052 9.69946Z\" stroke=\"#333333\" stroke-width=\"0.583478\" stroke-linejoin=\"round\"/> <path d=\"M3.87374 5.9301C4.16429 5.9301 4.39983 5.69457 4.39983 5.40402C4.39983 5.11347 4.16429 4.87793 3.87374 4.87793C3.58319 4.87793 3.34766 5.11347 3.34766 5.40402C3.34766 5.69457 3.58319 5.9301 3.87374 5.9301Z\" fill=\"#333333\"/> <path d=\"M7.41281 5.9301C7.70336 5.9301 7.93889 5.69457 7.93889 5.40402C7.93889 5.11347 7.70336 4.87793 7.41281 4.87793C7.12226 4.87793 6.88672 5.11347 6.88672 5.40402C6.88672 5.69457 7.12226 5.9301 7.41281 5.9301Z\" fill=\"#333333\"/> </svg>", "收藏": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M5.4996 1.01562L6.86614 3.78678L9.92499 4.23101L7.7123 6.3887L8.23691 9.43486L5.4996 7.99639L2.7623 9.43486L3.28691 6.3887L1.07422 4.23101L4.13306 3.78678L5.4996 1.01562Z\" stroke=\"#333333\" stroke-width=\"0.727692\" stroke-linejoin=\"round\"/> </svg>", "复制": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M6.4171 2.44434H2.75043C1.90667 2.44434 1.22266 3.12835 1.22266 3.97211V8.861C1.22266 9.70477 1.90667 10.3888 2.75043 10.3888H6.4171C7.26087 10.3888 7.94488 9.70477 7.94488 8.861V3.97211C7.94488 3.12835 7.26087 2.44434 6.4171 2.44434Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> <path d=\"M3.6658 0.611328H8.55469C8.87884 0.611328 9.18972 0.740098 9.41893 0.969309C9.64814 1.19852 9.77691 1.5094 9.77691 1.83355V7.94466M3.05469 5.50022H6.11024M3.05469 7.63911H6.11024\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>", "引用发笔记": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M1.22244 1.22266H9.77799C9.94007 1.22266 10.0955 1.28704 10.2101 1.40165C10.3247 1.51625 10.3891 1.67169 10.3891 1.83377V7.94488C10.3891 8.10696 10.3247 8.26239 10.2101 8.377C10.0955 8.49161 9.94007 8.55599 9.77799 8.55599H5.50022L3.05577 10.3893V8.55599H1.22244C1.06036 8.55599 0.904924 8.49161 0.790319 8.377C0.675713 8.26239 0.611328 8.10696 0.611328 7.94488V1.83377C0.611328 1.67169 0.675713 1.51625 0.790319 1.40165C0.904924 1.28704 1.06036 1.22266 1.22244 1.22266Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/> <path d=\"M3.66602 4.27734V5.49957M6.11046 4.27734V5.49957\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>", "私信": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M10.3891 0.611328L0.611328 4.88911L4.27799 6.41688L5.80577 10.3891L10.3891 0.611328Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/> <path d=\"M4.27734 6.41688L10.3885 0.611328\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>", "移出大家晒的": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M5.50022 10.3891C8.20028 10.3891 10.3891 8.20028 10.3891 5.50022C10.3891 2.80016 8.20028 0.611328 5.50022 0.611328C2.80016 0.611328 0.611328 2.80016 0.611328 5.50022C0.611328 8.20028 2.80016 10.3891 5.50022 10.3891Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> <path d=\"M3.36133 5.5H7.63911\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>", "不给熟人看": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M0.304688 5.49978C0.304688 5.49978 2.13802 2.13867 5.49913 2.13867C8.86024 2.13867 10.6936 5.49978 10.6936 5.49978C10.6936 5.49978 8.86024 8.86089 5.49913 8.86089C2.13802 8.86089 0.304688 5.49978 0.304688 5.49978Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> <path d=\"M5.50069 6.84416C6.24321 6.84416 6.84514 6.24223 6.84514 5.49972C6.84514 4.7572 6.24321 4.15527 5.50069 4.15527C4.75818 4.15527 4.15625 4.7572 4.15625 5.49972C4.15625 6.24223 4.75818 6.84416 5.50069 6.84416Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> <path d=\"M1.22266 9.77821L9.77821 1.22266\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>", "不喜欢": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M5.5 9.625C7.77817 9.625 9.625 7.77817 9.625 5.5C9.625 3.22183 7.77817 1.375 5.5 1.375C3.22183 1.375 1.375 3.22183 1.375 5.5C1.375 7.77817 3.22183 9.625 5.5 9.625Z\" stroke=\"#333333\" stroke-width=\"0.733333\"/> <path d=\"M3.39258 4.40039C3.62174 4.81289 3.89674 4.99622 4.21758 4.99622C4.53841 4.99622 4.81341 4.81289 5.04258 4.40039M5.95924 4.40039C6.18841 4.81289 6.46341 4.99622 6.78424 4.99622C7.10508 4.99622 7.38008 4.81289 7.60924 4.40039M3.94258 6.87539H7.05924\" stroke=\"#333333\" stroke-width=\"0.733333\" stroke-linecap=\"round\"/> </svg>", "举报 ›": "<svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <g> <path d=\"M5.50022 0.916992L10.3891 9.7781H0.611328L5.50022 0.916992Z\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/> <path d=\"M5.5 4.27734V6.72179\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> <path d=\"M5.49922 8.86074C5.80298 8.86074 6.04922 8.6145 6.04922 8.31074C6.04922 8.00699 5.80298 7.76074 5.49922 7.76074C5.19546 7.76074 4.94922 8.00699 4.94922 8.31074C4.94922 8.6145 5.19546 8.86074 5.49922 8.86074Z\" fill=\"#333333\" stroke=\"#333333\" stroke-width=\"0.62\" stroke-linecap=\"round\"/> </g>  </svg>"};const MK=260/248;
+function bottomSheet(h,build){const wrap=document.createElement('div');wrap.className='n';wrap.style.cssText=`left:0;top:0;width:${px(FW)};height:${px(FH)};z-index:60`;
+  const dim=document.createElement('div');dim.className='n';dim.style.cssText='left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);opacity:0;transition:opacity .26s';
+  const sh=document.createElement('div');sh.className='n';sh.style.cssText=`left:0;top:${px(FH-h)};width:${px(FW)};height:${px(h)};background:#f5f5f7;border-radius:${px(10*MK)} ${px(10*MK)} 0 0;transform:translateY(100%);transition:transform .34s ${SPRING}`;
+  const gr=document.createElement('div');gr.className='n';gr.style.cssText=`left:${px(113*MK)};top:${px(6*MK)};width:${px(22*MK)};height:${px(3*MK)};border-radius:${px(2)};background:#d9d9d9`;sh.appendChild(gr);
+  const hb=document.createElement('div');hb.className='n';hb.style.cssText=`left:${px(83.1*MK)};top:${px(531.2*MK)};width:${px(81.8*MK)};height:${px(3*MK)};border-radius:${px(2*MK)};background:#000;z-index:2`;
+  wrap.append(dim,sh,hb);CUR.appendChild(wrap);
+  let shut=false;const close=fn=>{if(shut)return;shut=true;sh.style.transition=`transform .26s ${SPRING}`;sh.style.transform='translateY(100%)';dim.style.opacity=0;setTimeout(()=>{wrap.remove();fn&&fn();},260);};
+  dim.onclick=()=>close();build(sh,close);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{dim.style.opacity=1;sh.style.transform='none';}));return close;}
+function sheetCard(sh,y,items,pick,icons=true){const RH=27*MK,c=document.createElement('div');c.className='n';
+  c.style.cssText=`left:${px(9*MK)};top:${px(y)};width:${px(230*MK)};height:${px(items.length*RH)};background:#fff;border-radius:${px(6*MK)};overflow:hidden`;
+  items.forEach((lab,i)=>{const b=document.createElement('button');b.className='n mrow';b.style.cssText=`left:0;top:${px(i*RH)};width:100%;height:${px(RH)}`+(i<items.length-1?`;box-shadow:inset 0 ${px(-.6*MK)} 0 #efefef`:'');
+    const ic=icons&&MENU_IC[lab]?`<span class="n" style="left:${px(11*MK)};top:${px((RH-11*MK)/2)};width:${px(11*MK)};height:${px(11*MK)}">${MENU_IC[lab].replace('width="11" height="11"',`width="${(11*MK*K).toFixed(2)}" height="${(11*MK*K).toFixed(2)}"`)}</span>`:'';
+    // a row that opens more (举报 ›): the chevron sits at the row's right edge, like the app's settings rows
+    const more=/ ›$/.test(lab),name=lab.replace(/ ›$/,''),cw=4.2*MK,chH=7.4*MK;
+    const chev=more?`<span class="n" style="right:${px(11*MK)};top:${px((RH-chH)/2)};width:${px(cw)};height:${px(chH)}"><svg width="100%" height="100%" viewBox="0 0 5 9" fill="none" preserveAspectRatio="none"><path d="M1 1l3 3.5L1 8" stroke="#BBBBBB" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`:'';
+    b.innerHTML=`${ic}<span class="n" style="left:${px(icons?30*MK:11*MK)};top:0;height:${px(RH)};line-height:${px(RH)};font-size:${px(9*MK)};white-space:nowrap">${name}</span>${chev}`;b.onclick=()=>pick(lab);c.appendChild(b);});
+  sh.appendChild(c);return y+items.length*RH;}
+function commentMenu(own,pick){const G=own?[['回复','收藏','复制','引用发笔记','私信'],['移出大家晒的','不给熟人看'],['不喜欢','举报 ›']]:[['回复','收藏','复制','引用发笔记','私信'],['不喜欢','举报 ›']];
+  const h=(own?299:236)*MK;return bottomSheet(h,(sh,close)=>{let y=18*MK;G.forEach(g=>{y=sheetCard(sh,y,g,lab=>pick(lab,close))+9*MK;});});}
+/* press and hold a comment: the row darkens a little while you hold, then the sheet comes up */
+function longPress(h,row,fn){let tm=null,x0=0,y0=0;const fb=document.createElement('div');fb.className='n';
+  fb.style.cssText=`left:${px(row.x)};top:${px(row.y)};width:${px(row.w)};height:${px(row.h)};background:#000;opacity:0;pointer-events:none;z-index:39`;h.parentNode.insertBefore(fb,h);
+  const off=ms=>{fb.style.transition=`opacity ${ms}s`;fb.style.opacity=0;};
+  h.style.touchAction='pan-y';h.addEventListener('contextmenu',e=>e.preventDefault());
+  h.addEventListener('pointerdown',e=>{x0=e.clientX;y0=e.clientY;fb.style.transition='opacity .3s ease-out';fb.style.opacity=.06;
+    tm=setTimeout(()=>{tm=null;h._dragged=true;fn(()=>off(.2));},450);});
+  const cancel=()=>{if(tm){clearTimeout(tm);tm=null;off(.15);}setTimeout(()=>h._dragged=false,60);};
+  h.addEventListener('pointermove',e=>{if(tm&&Math.hypot(e.clientX-x0,e.clientY-y0)>8)cancel();});['pointerup','pointercancel','pointerleave'].forEach(k=>h.addEventListener(k,cancel));}
+/* the sheet of 大家晒的 with a share on top: yours (D13) or someone else's (D15) */
+function sharedSheet(own){const t=clone('s09');const oi=overlayIdx(t);walk(t,()=>{});
+  const tbg=t.c.find(o=>o.f&&o.f[0].c==='rgba(0,0,0,0.75)');const ttx=byText(t,'晒好啦')[0];tbg._skip=ttx._skip=1;
+  const hl=t.c.find((o,i)=>i>oi&&o.t==='RE'&&Math.abs(o.y-155.22)<.5&&o.w===260);
+  if(!own){const av=t.c.find((o,i)=>i>oi&&o.t==='EL'&&Math.abs(o.y-162.99)<.5);av.f=[{img:'i5'}];setText(byText(t,'我')[0],'一只小厨');setText(byText(t,'照着做好了，油留着炒肉真的香')[0],'超好吃！同款锅主页有链接');
+    const ph=t.c.find((o,i)=>i>oi&&o.t==='RE'&&Math.abs(o.y-197.26)<.5);ph.f=[{img:'i0'}];}
+  return {t,oi,row:{x:0,y:155.22,w:260,h:151.99}};}
+const isBarD=o=>(o.y>=501&&o.w>=239)||(o.y>550&&o.w>80&&o.h<4)||txt(o)==='我也晒一个';
+/* D13 your own share: long-press -> 移出大家晒的 / 不给熟人看 */
+function sD1(){go(1,'长按你晒的这条（按住不放）');const {t,oi,row}=sharedSheet(true);
+  render(t,{layerFrom:oi,anim:'up',dy:FH-97});
+  const shut=()=>sD2({anim:'dismiss',dy:FH-97});hot(find(t,o=>o.n==='ic/close')[0],shut,{label:'关闭'});hotRect(0,0,260,96,shut,'关闭大家晒的');
+  let gone=false;const h=hotRect(row.x,row.y,row.w,row.h,()=>note('要长按，按住不放'),'长按你晒的这条');
+  longPress(h,row,clear=>{if(gone)return;go(1,'选「移出大家晒的」或「不给熟人看」');
+    commentMenu(true,(lab,close)=>{if(lab==='移出大家晒的'){close(()=>{clear();gone=true;h.remove();
+        // the row folds away, the ones below close the gap; the count goes down by one
+        const mine=t.c.filter((o,i)=>i>oi&&o._el&&o._ay>=row.y-1&&o._ay<row.y+row.h&&!isBarD(o));const below=t.c.filter((o,i)=>i>oi&&o._el&&o._ay>=row.y+row.h&&!isBarD(o));
+        mine.forEach(o=>{o._el.style.transition='opacity .16s';o._el.style.opacity=0;});
+        setTimeout(()=>below.forEach(o=>{o._el.style.transition=`transform .34s ${SPRING}`;o._el.style.transform=`translateY(${px(-(317.56-155.22))})`;}),120);
+        byText(t,'大家晒的 87').forEach(o=>o._el&&(o._el.firstChild.textContent='大家晒的 86'));
+        appToast('已移出「大家晒的」，评论区里还在',{delay:200});
+        go(1,'移出了：评论还在评论区，只是不再收进「大家晒的」',[{label:'下一个 ›',pri:1,fn:()=>sD2({anim:'dismiss',dy:FH-97})}]);});}
+      else if(lab==='不给熟人看'){close(()=>{clear();appToast('已设置，熟人看不到这条',{delay:120});
+        go(1,'设好了：熟人看不到这条晒图；也可以再长按，把它移出「大家晒的」',[{label:'下一个 ›',pri:1,fn:()=>sD2({anim:'dismiss',dy:FH-97})}]);});}
+      else note('这一步点「移出大家晒的」或「不给熟人看」');});});}
+/* D14 a question nobody asked yet: no hint, sending works as usual */
+function sD2(o={}){go(2,'点评论框，问一个还没人问过的问题');NOTE_TOP=null;const t=clone('s02');render(t,noteScroll(t,o));noteBack(t);
+  hotRect(40,97,212,28,()=>s05D(),'评论输入框');hotRect(9,512,100,26,()=>s05D(),'说点什么');}
+function s05D(){go(2,'正在输入…');const t=clone('s05');const oi=t.c.findIndex(o=>o.n==='遮罩');
+  const q=byText(t,'没有红葱头，用洋葱代替可以吗')[0];const full='卤好的肉能冷冻保存吗';setText(q,'');
+  const caret=t.c.find(o=>o.n==='Rectangle'&&o.f&&o.f[0].c==='#ff2442'&&o.w<2);
+  find(t,o=>o.n==='原位提示 · 头像版').forEach(o=>o._skip=1);const send=t.c.find(o=>o.n==='发送按钮');
+  const panel=t.c.find(o=>o.n==='评论输入面板');const grow=250.96-230.04;panel.y+=grow;panel.h-=grow;
+  render(t,{layerFrom:oi,anim:'up',dy:FH-220,over:true});caret._el.classList.add('caret');caret._el.style.left=px(q._ax+0.6);
+  const span=q._el.firstChild;let i=0,gone=false;
+  const tick=()=>{if(gone)return;if(i<=full.length){span.textContent=full.slice(0,i);caret._el.style.left=px(q._ax+q._el.offsetWidth/K+0.6);i++;setTimeout(tick,80);}
+    else{go(2,'没找到相似提问，就不出提示：直接点「发送」');hot(send,()=>s02Posted(full+'',()=>go(2,'问题照常发出去了，没有多余的打扰',[{label:'下一个 ›',pri:1,fn:()=>sD3()}])),{pad:4,label:'发送'});}};
+  setTimeout(tick,420);hotRect(0,0,260,218,()=>{gone=true;sD2({anim:'dismiss',dy:FH-220});},'收起输入');}
+/* D15 a share that wasn't really cooked: the existing 举报, with one more reason */
+function sD3(){go(3,'这条晒图像是盗来的：长按它，点「举报」');const {t,oi,row}=sharedSheet(false);
+  render(t,{layerFrom:oi,anim:'up',dy:FH-97});
+  const shut=()=>sD2({anim:'dismiss',dy:FH-97});hot(find(t,o=>o.n==='ic/close')[0],shut,{label:'关闭'});hotRect(0,0,260,96,shut,'关闭大家晒的');
+  const h=hotRect(row.x,row.y,row.w,row.h,()=>note('要长按，按住不放'),'长按这条晒图');
+  longPress(h,row,clear=>{go(3,'别人的评论没有「移出」，点「举报」');
+    commentMenu(false,(lab,close)=>{if(lab!=='举报 ›')return note('这一步点「举报」');
+      close(()=>{go(3,'选「不是自己做的」');const R=['垃圾广告','违法违规','色情低俗','人身攻击','不实信息','不是自己做的','其他'];
+        bottomSheet((38+R.length*27+20)*MK,(sh,close2)=>{const tt=document.createElement('div');tt.className='n';
+          tt.style.cssText=`left:0;top:${px(15*MK)};width:100%;text-align:center;font-size:${px(9.5*MK)};font-weight:500;line-height:${px(14*MK)};color:#333`;tt.textContent='举报原因';sh.appendChild(tt);
+          sheetCard(sh,38*MK,R,r=>{if(r!=='不是自己做的')return note('这一步选「不是自己做的」');
+            close2(()=>{clear();appToast('已提交，核实后会移出「大家晒的」',{delay:120});setTimeout(endCard,1100);});},false);});});});});}
+
+/* ---------- boot / sizing ---------- */
+function fit(){applyMode();const compact=document.documentElement.classList.contains('m');const touch=compact&&matchMedia('(pointer:coarse)').matches;
+  document.documentElement.classList.toggle('touch',touch);MOBILE=false;
+  // phone: keep the frame visible; leave room for the header and the step card (fixed reserve, so the phone never resizes between steps)
+  const wideM=compact&&innerWidth>760;
+  if(wideM){const head=$('#mhead').offsetHeight||46,cardH=$('#mbar').offsetHeight||128;K=Math.min((430-32-12)/FW,(innerHeight-80-head-12-14-cardH)/FH);}
+  else if(compact){const head=$('#mhead').offsetHeight||46,mb=$('#mbar').getBoundingClientRect(),cardTop=mb.height?mb.top:innerHeight-138;
+    K=Math.min((Math.min(innerWidth,430)-32-12)/FW,(cardTop-head-6-12-12)/FH);} // measured from where the card actually starts, so the card never covers the phone
+  else{K=Math.min(1.5,(innerHeight-64)/FH);}
+  const bez=compact?6:9;
+  screen.style.width=px(FW);screen.style.height=px(FH);screen.style.borderRadius=px(25.87);$('#phone').style.borderRadius=`calc(${px(25.87)} + ${bez}px)`;
+  // the guide starts level with the top of the phone and grows downward, so it never jumps while you go through the steps
+  const ph=FH*K+18;$('.rail').style.marginTop=compact?'':Math.max(0,(innerHeight-ph)/2-24+18)+'px';}
+let MODE=(()=>{try{return localStorage.getItem('demoMode')||'desktop';}catch(e){return 'desktop';}})();
+function applyMode(){const r=document.documentElement,wide=innerWidth>760,m=!wide||MODE==='phone';r.classList.toggle('wide',wide);r.classList.toggle('m',m);
+  document.querySelectorAll('.modesw button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.m==='phone')===m)));}
+function reopen(){const n=PATHS[path].steps.length;step>=n?(jump(path,n-1),endCard()):jump(path,step);}
+document.querySelectorAll('.modesw button').forEach(b=>b.onclick=()=>{if(MODE===b.dataset.m)return;MODE=b.dataset.m;try{localStorage.setItem('demoMode',MODE);}catch(e){}reopen();});
+const STARTS={A:s01,B:s02B,C:s03C,D:()=>s02D(0)};
+/* open any step directly, already set up */
+const JUMP={
+  A:[()=>s01(),()=>s02A(),()=>sheetA('全部',true),()=>sheetA('踩过的坑',true)],
+  B:[()=>s02B(),()=>s06({jump:true}),()=>{s06({jump:true});s07();}],
+  C:[()=>s03C(),()=>s09(),()=>{s09();go(2,'看到 516 晒的也帮到了你：长按它的爱心');},()=>{s09();s11();}],
+  D:[()=>s02D(0),()=>{s02D(2);sD1();},()=>sD2(),()=>{sD2();sD3();}]};
+function jump(p,i){clearFlow();path=p;step=i;fit();JUMP[p][i]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
+function start(p){clearFlow();path=p;step=0;NOTE_TOP=null;NOTE_SLIDE=0;rail();fit();STARTS[p]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
+// width change: start the path again; height change (e.g. the viewer sheet opening): re-fit and reopen the same step
+let rz,lastW=innerWidth,lastH=innerHeight;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{
+  if(Math.abs(innerWidth-lastW)>=2){lastW=innerWidth;lastH=innerHeight;start(path);return;}
+  if(Math.abs(innerHeight-lastH)>=24){lastH=innerHeight;reopen();}},250);});
+const h=(location.hash||'').slice(1).toUpperCase();
+start(['A','B','C','D'].includes(h)?h:'A');
+</script>
