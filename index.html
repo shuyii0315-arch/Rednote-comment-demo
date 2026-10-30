@@ -19,8 +19,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .paths{display:flex;flex-direction:column;gap:6px}
 .path{border-radius:14px;position:relative;z-index:1}
 #paths{position:relative}
-/* one white card that glides to the open section (and follows it while it grows), instead of each section switching its own background */
-.hl{position:absolute;left:0;right:0;top:0;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);z-index:0;pointer-events:none;will-change:transform,height}
+/* each section carries its own white card, so the card is always exactly the section's shape while it folds/unfolds; it fades on the same curve */
+.path{background:rgba(255,255,255,0);box-shadow:0 1px 2px rgba(0,0,0,0),0 8px 24px rgba(0,0,0,0);transition:background .46s cubic-bezier(.45,0,.2,1),box-shadow .46s cubic-bezier(.45,0,.2,1)}
+.path.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06)}
 .pathbtn{display:flex;gap:12px;align-items:baseline;text-align:left;padding:13px 16px;border-radius:14px;width:100%}
 .path:not(.on) .pathbtn:hover{background:rgba(255,255,255,.65)}
 .pathbtn .k{font-weight:600;width:24px;height:24px;border-radius:12px;background:#fff;color:#8C8C8C;display:grid;place-items:center;font-size:12px;flex:none;box-shadow:inset 0 0 0 1px #E3E4E8}
@@ -34,7 +35,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .path .pathbtn .k,.path .pathbtn b{transition:background .25s,color .25s,box-shadow .25s}
 .steps li{transition:color .25s}
 .steps li::before{transition:background .25s,border-color .25s,box-shadow .3s}
-.cur.in{animation:curin .32s cubic-bezier(.32,.72,0,1) both}
+.cur.in{animation:curin .46s cubic-bezier(.45,0,.2,1) .06s both}
 @keyframes curin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .acts button,.restart,.pathbtn{transition:transform .1s ease-out,background .2s}
 .acts button:active,.restart:active{transform:scale(.97)}
@@ -49,7 +50,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .steps li.now::before{background:#FF2442;border-color:#FF2442;box-shadow:0 0 0 4px rgba(255,36,66,.14)}
 .steps li.fin::before{background:#222;border-color:#222}
 .steps li.fin{color:#222;font-weight:500}
-.cur{margin-top:8px;padding:10px 12px;border-radius:10px;background:#F6F7F9;font-size:13.5px;line-height:1.55;color:#222;font-weight:400}
+.cur{box-sizing:border-box;margin-top:8px;padding:10px 12px;border-radius:10px;background:#F6F7F9;font-size:13.5px;line-height:1.55;color:#222;font-weight:400}
 .cur .note{display:block;font-size:12px;color:#B26A00;margin-top:4px}
 .cur .note:empty{display:none}
 .stepbtn{display:block;width:100%;text-align:left;font:inherit;color:inherit;padding:0;border-radius:6px;transition:color .2s}
@@ -444,6 +445,7 @@ function spinner(cx,cy,d,parent){const w=document.createElement('div');w.classNa
   w.innerHTML=`<svg width="${(d*K).toFixed(2)}" height="${(d*K).toFixed(2)}" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="#FF2442" stroke-width="2" stroke-linecap="round" pathLength="100"/></svg>`;(parent||CUR).appendChild(w);return w;}
 let BUSY=false;
 /* delayed steps of a flow (banners, toasts, auto tips) are tracked so jumping to another step cancels them */
+const RAW_ST=window.setTimeout.bind(window); // for the guide rail's own housekeeping: not cancelled when the demo jumps to a step
 const TIMERS=new Set();{const st=window.setTimeout.bind(window);window.setTimeout=(f,ms,...a)=>{const id=st(()=>{TIMERS.delete(id);typeof f==='function'?f(...a):0;},ms);TIMERS.add(id);return id;};}
 function clearFlow(){QA_OPEN=false;TIMERS.forEach(id=>clearTimeout(id));TIMERS.clear();BUSY=false;PREV=null;NOTE_TOP=null;NOTE_SLIDE=0;document.querySelectorAll('.msheet').forEach(m=>m.remove());screen.innerHTML='';CUR=null;}
 /* as in the recording: the tapped tab turns on at once; a small light loading card with the red spinner sits in the
@@ -509,18 +511,32 @@ const PATHS={
 let path='A',step=0;
 let RAIL_PATH=null;
 const SPRING='cubic-bezier(.32,.72,0,1)'; // critically damped feel, no overshoot (guide UI, not a flick)
+
+/* rail motion: one easing and one duration for every layout change here, gentle at both ends (no fast start that reads as a jump) */
+const RM=460,RE_CSS='cubic-bezier(.45,0,.2,1)';
+const bez=(x1,y1,x2,y2)=>t=>{let u=t;for(let i=0;i<8;i++){const x=3*(1-u)*(1-u)*u*x1+3*(1-u)*u*u*x2+u*u*u-t,d=3*(1-u)*(1-u)*x1+6*(1-u)*u*(x2-x1)+3*u*u*(1-x2);if(Math.abs(x)<1e-5||!d)break;u=Math.min(1,Math.max(0,u-x/d));}return 3*(1-u)*(1-u)*u*y1+3*(1-u)*u*u*y2+u*u*u;};
+const RE_JS=bez(.45,0,.2,1);
 let HL_RUN=0;
-function glideCard(k){const box=$('#paths');let hl=box.querySelector('.hl');const sec=box.querySelector(`.path[data-k="${k}"]`);if(!sec)return;
-  if(!hl){hl=document.createElement('div');hl.className='hl';box.prepend(hl);hl._y=sec.offsetTop;hl._h=sec.offsetHeight;}
-  // where the open section will be once every fold/unfold has finished: its own height and everything above it, at their target heights
+/* the one white card: on a section change it glides to where the new section will settle; otherwise it simply follows the open section */
+function glideCard(k,tween){const box=$('#paths');let hl=box.querySelector('.hl');const sec=box.querySelector(`.path[data-k="${k}"]`);if(!sec)return;
+  if(!hl){hl=document.createElement('div');hl.className='hl';box.prepend(hl);hl._y=sec.offsetTop;hl._h=sec.offsetHeight;tween=false;}
+  if(!tween&&hl._until&&performance.now()<hl._until&&hl._k===k)return; // a glide to this section is under way: let it land, it follows the section afterwards
   const secs=[...box.querySelectorAll('.path')],dh=el=>{const pb=el.querySelector('.pbody');return (pb._to==null?pb.offsetHeight:pb._to)-pb.offsetHeight;};
   let y1=sec.offsetTop;for(const o of secs){if(o===sec)break;y1+=dh(o);}const h1=sec.offsetHeight+dh(sec);
-  const y0=hl._y,h0=hl._h,t0=performance.now(),DUR=REDUCED()?0:380,run=++HL_RUN,ease=p=>1-Math.pow(1-p,3.4);
-  const f=now=>{if(run!==HL_RUN)return;const p=DUR?Math.min(1,(now-t0)/DUR):1,e=ease(p);
-    if(p<1){hl._y=y0+(y1-y0)*e;hl._h=h0+(h1-h0)*e;}else{hl._y=sec.offsetTop;hl._h=sec.offsetHeight;} // then just stay on it
+  const y0=hl._y,h0=hl._h,t0=performance.now(),DUR=tween&&!REDUCED()?RM:0,run=++HL_RUN;hl._k=k;hl._until=t0+DUR;
+  const f=now=>{if(run!==HL_RUN)return;const p=DUR?Math.min(1,(now-t0)/DUR):1,e=RE_JS(p);
+    if(p<1){hl._y=y0+(y1-y0)*e;hl._h=h0+(h1-h0)*e;}else{hl._y=sec.offsetTop;hl._h=sec.offsetHeight;}
     hl.style.transform=`translateY(${hl._y}px)`;hl.style.height=hl._h+'px';
-    if(now-t0<DUR+500)requestAnimationFrame(f);};
+    if(now-t0<Math.max(DUR,RM)+300)requestAnimationFrame(f);};
   requestAnimationFrame(f);}
+/* moving the hint card to the next step: the old one folds away under its row while the new one unfolds under the next row, same curve,
+   so the rows in between move only because heights change — nothing slides across anything */
+function swapCard(cur,oldHost,ghost){
+  const gh=cur.offsetHeight;ghost.removeAttribute('id');ghost.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));ghost.classList.remove('in');ghost.style.overflow='hidden';ghost.style.pointerEvents='none';
+  oldHost.appendChild(ghost);const h0=ghost.offsetHeight;
+  ghost.animate([{height:h0+'px',paddingTop:'10px',paddingBottom:'10px',marginTop:'8px',opacity:1},{height:'0px',paddingTop:'0px',paddingBottom:'0px',marginTop:'0px',opacity:0}],{duration:RM,easing:RE_CSS,fill:'forwards'}).onfinish=()=>ghost.remove();RAW_ST(()=>ghost.remove(),RM+80);
+  const h1=cur.offsetHeight;cur.style.overflow='hidden';
+  cur.animate([{height:'0px',paddingTop:'0px',paddingBottom:'0px',marginTop:'0px',opacity:0},{opacity:0,offset:.3},{height:h1+'px',paddingTop:'10px',paddingBottom:'10px',marginTop:'8px',opacity:1}],{duration:RM,easing:RE_CSS}).onfinish=()=>{cur.style.overflow='';};}
 function rail(){
   const steps=PATHS[path].steps;
   const build=()=>{const body=k=>`<div class="pbody"><div class="pin"><ol class="steps">${PATHS[k].steps.map((t,i)=>`<li><button class="stepbtn" data-p="${k}" data-i="${i}">${t}</button></li>`).join('')}<li class="fin" hidden>走完了</li></ol></div></div>`;
@@ -529,30 +545,30 @@ function rail(){
       +`<div class="cur" id="cur" aria-live="polite"><span id="tiptext"></span><span class="note" id="tipnote"></span><div class="acts" id="tacts"></div><div class="ctl" id="tctl"></div></div>`;};
   if(!$('#cur'))build();
   const open=path,changed=RAIL_PATH!==open;RAIL_PATH=open;
-  // FLIP: remember where every row and the hint card sit right now (mid-motion included), so after the change they glide from there instead of jumping
-  const curEl=$('#cur'),flip=REDUCED()?[]:[...document.querySelectorAll('.path.on .steps li'),curEl].map(el=>({el,top:el.getBoundingClientRect().top,vis:el.offsetParent!==null}));
-  const tipOld=$('#tiptext').textContent;
-  flip.forEach(f=>f.el.getAnimations().forEach(a=>{if(a.id==='flip')a.cancel();}));
-  // put the new words and buttons in first, so every height below is measured with the final content (no snap when it settles)
+  const curEl=$('#cur'),oldHost=curEl.parentNode,ghost=curEl.cloneNode(true); // the card as it looks now, before the words change
+  // new words and buttons go in first, so every height is measured with the final content
   $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';
   $('#tacts').innerHTML=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}">${a.label}</button>`).join('');$('#tctl').innerHTML=step<steps.length?'<button>再来一遍</button>':'';
-  // accordion: the open path grows to its content height, the others fold — animated from their current height
+  let swapping=false;
+  // accordion: the open section unfolds to its content height while the others fold, from wherever they are now, on the same curve
   document.querySelectorAll('.path').forEach(sec=>{const k=sec.dataset.k,on=k===open,pb=sec.querySelector('.pbody'),btn=sec.querySelector('.pathbtn');
     sec.classList.toggle('on',on);btn.setAttribute('aria-current',on);btn.setAttribute('aria-expanded',on);
     const from=pb.getBoundingClientRect().height;
     if(on){const li=[...sec.querySelectorAll('.steps li')];li.forEach((el,i)=>{el.className=i<steps.length?(i<step?'done':i===step?'now':''):'fin';if(i===steps.length)el.hidden=step<steps.length;});
-      const host=step>=steps.length?li[steps.length]:li[step];const cur=$('#cur');
-      if(cur.parentNode!==host){const was=cur.parentNode&&cur.parentNode!==$('#paths')&&!changed;host.appendChild(cur);cur.classList.remove('in');if(!was){void cur.offsetWidth;cur.classList.add('in');}}}
+      const host=step>=steps.length?li[steps.length]:li[step];const cur=curEl;
+      if(cur.parentNode!==host){const within=!changed&&oldHost&&oldHost!==$('#paths')&&sec.contains(oldHost)&&!REDUCED();
+        cur.getAnimations().forEach(a=>a.cancel());host.appendChild(cur);cur.classList.remove('in');
+        if(within){swapping=true;swapCard(cur,oldHost,ghost);}
+        else{void cur.offsetWidth;cur.classList.add('in');
+          // moving to another section: a still copy stays where the card was, so the folding section keeps its layout instead of snapping shut inside
+          if(oldHost&&oldHost!==$('#paths')&&oldHost.isConnected&&!REDUCED()){ghost.removeAttribute('id');ghost.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));ghost.classList.remove('in');ghost.style.pointerEvents='none';oldHost.appendChild(ghost);
+            ghost.animate([{opacity:1},{opacity:0}],{duration:RM*.7,easing:'ease-out',fill:'forwards'});RAW_ST(()=>ghost.remove(),RM+40);}}}}
+    if(on&&swapping){pb.style.transition='none';pb.style.height='auto';pb._to=null;return;} // its height follows the fold/unfold inside
     const to=on?pb.firstElementChild.getBoundingClientRect().height:0;pb._to=to;
-    if(Math.abs(from-to)>.5){pb.style.transition='none';pb.style.height=from+'px';void pb.offsetHeight;pb.style.transition=`height .38s ${SPRING}`;pb.style.height=to+'px';
-      clearTimeout(pb._t);pb._t=setTimeout(()=>{if(sec.classList.contains('on'))pb.style.height='auto';},400);}
+    if(Math.abs(from-to)>.5&&!REDUCED()){pb.style.transition='none';pb.style.height=from+'px';void pb.offsetHeight;pb.style.transition=`height ${RM}ms ${RE_CSS}`;pb.style.height=to+'px';
+      clearTimeout(pb._t);pb._t=RAW_ST(()=>{if(sec.classList.contains('on'))pb.style.height='auto';},RM+30);}
     else pb.style.height=on?'auto':'0px';});
-  glideCard(open);
-  $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';mmsg();
-  queueMicrotask(()=>{ // after the buttons below are in place too
-    if(!changed)flip.forEach(f=>{if(!f.vis||!f.el.isConnected||f.el.offsetParent===null)return;const dy=f.top-f.el.getBoundingClientRect().top;if(Math.abs(dy)<.5)return;
-      const a=f.el.animate([{transform:`translateY(${dy}px)`},{transform:'none'}],{duration:420,easing:SPRING});a.id='flip';});
-    const tt=$('#tiptext');if(!REDUCED()&&tt.textContent!==tipOld&&!curEl.classList.contains('in'))[tt,$('#tacts')].forEach(e=>e.animate([{opacity:0},{opacity:1}],{duration:260,delay:60,easing:'ease-out',fill:'backwards'}));});
+  mmsg();
   const ah=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}" ${a.sel?'aria-pressed="true"':''}>${a.label}</button>`).join('');$('#tacts').innerHTML=ah;$('#macts').innerHTML=ah;$('#mbar').classList.toggle('has-acts',ACTS.length>0);
   document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>ACTS[+b.dataset.a].fn());
   // every step: replay it, or skip to the next one
