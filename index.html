@@ -537,7 +537,10 @@ function swapCard(cur,oldHost,ghost){
   ghost.animate([{height:h0+'px',paddingTop:'10px',paddingBottom:'10px',marginTop:'8px',opacity:1},{height:'0px',paddingTop:'0px',paddingBottom:'0px',marginTop:'0px',opacity:0}],{duration:RM,easing:RE_CSS,fill:'forwards'}).onfinish=()=>ghost.remove();RAW_ST(()=>ghost.remove(),RM+80);
   const h1=cur.offsetHeight;cur.style.overflow='hidden';
   cur.animate([{height:'0px',paddingTop:'0px',paddingBottom:'0px',marginTop:'0px',opacity:0},{opacity:0,offset:.3},{height:h1+'px',paddingTop:'10px',paddingBottom:'10px',marginTop:'8px',opacity:1}],{duration:RM,easing:RE_CSS}).onfinish=()=>{cur.style.overflow='';};}
-function rail(){
+/* one rail update per tick: a jump can call go() several times in a row (e.g. 09 then 10); only the last state is drawn, animated once from what was on screen */
+let RAIL_Q=false;
+function rail(){if(!$('#cur'))return railNow();if(RAIL_Q)return;RAIL_Q=true;queueMicrotask(()=>{RAIL_Q=false;railNow();});}
+function railNow(){
   const steps=PATHS[path].steps;
   const build=()=>{const body=k=>`<div class="pbody"><div class="pin"><ol class="steps">${PATHS[k].steps.map((t,i)=>`<li><button class="stepbtn" data-p="${k}" data-i="${i}">${t}</button></li>`).join('')}<li class="fin" hidden>走完了</li></ol></div></div>`;
     const rng=k=>{const n=PATHS[k].steps.map(t=>t.slice(0,2));return `${n[0]}–${n[n.length-1]}`;};
@@ -545,7 +548,7 @@ function rail(){
       +`<div class="cur" id="cur" aria-live="polite"><span id="tiptext"></span><span class="note" id="tipnote"></span><div class="acts" id="tacts"></div><div class="ctl" id="tctl"></div></div>`;};
   if(!$('#cur'))build();
   const open=path,changed=RAIL_PATH!==open;RAIL_PATH=open;
-  const curEl=$('#cur'),oldHost=curEl.parentNode,ghost=curEl.cloneNode(true); // the card as it looks now, before the words change
+  const curEl=$('#cur'),oldHost=curEl.parentNode,ghost=curEl.cloneNode(true),oldH=curEl.getBoundingClientRect().height; // the card as it looks now, before the words change
   // new words and buttons go in first, so every height is measured with the final content
   $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';
   $('#tacts').innerHTML=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}">${a.label}</button>`).join('');$('#tctl').innerHTML=step<steps.length?'<button>再来一遍</button>':'';
@@ -554,7 +557,9 @@ function rail(){
   document.querySelectorAll('.path').forEach(sec=>{const k=sec.dataset.k,on=k===open,pb=sec.querySelector('.pbody'),btn=sec.querySelector('.pathbtn');
     sec.classList.toggle('on',on);btn.setAttribute('aria-current',on);btn.setAttribute('aria-expanded',on);
     const from=pb.getBoundingClientRect().height;
-    if(on){const li=[...sec.querySelectorAll('.steps li')];li.forEach((el,i)=>{el.className=i<steps.length?(i<step?'done':i===step?'now':''):'fin';if(i===steps.length)el.hidden=step<steps.length;});
+    if(on){const li=[...sec.querySelectorAll('.steps li')];li.forEach((el,i)=>{el.className=i<steps.length?(i<step?'done':i===step?'now':''):'fin';if(i===steps.length){const show=!(step<steps.length),was=!el.hidden;el.hidden=!show;
+        // 「走完了」 unfolds into place instead of appearing at full height
+        if(show&&!was&&!changed&&!REDUCED()){el.animate([{marginTop:'-34px',opacity:0},{marginTop:'-20px',opacity:0,offset:.35},{marginTop:'0px',opacity:1}],{duration:RM,easing:RE_CSS});}}});
       const host=step>=steps.length?li[steps.length]:li[step];const cur=curEl;
       if(cur.parentNode!==host){const within=!changed&&oldHost&&oldHost!==$('#paths')&&sec.contains(oldHost)&&!REDUCED();
         cur.getAnimations().forEach(a=>a.cancel());host.appendChild(cur);cur.classList.remove('in');
@@ -569,6 +574,9 @@ function rail(){
       clearTimeout(pb._t);pb._t=RAW_ST(()=>{if(sec.classList.contains('on'))pb.style.height='auto';},RM+30);}
     else pb.style.height=on?'auto':'0px';});
   mmsg();
+  // same card, new words (e.g. a tip that updates a moment later): its height eases to the new size instead of snapping
+  queueMicrotask(()=>{if(REDUCED()||curEl.parentNode!==oldHost||curEl.getAnimations().length)return;const nh=curEl.getBoundingClientRect().height;if(Math.abs(nh-oldH)<1)return;
+    curEl.style.overflow='hidden';curEl.animate([{height:oldH+'px'},{height:nh+'px'}],{duration:RM*.8,easing:RE_CSS}).onfinish=()=>{curEl.style.overflow='';};});
   const ah=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}" ${a.sel?'aria-pressed="true"':''}>${a.label}</button>`).join('');$('#tacts').innerHTML=ah;$('#macts').innerHTML=ah;$('#mbar').classList.toggle('has-acts',ACTS.length>0);
   document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>ACTS[+b.dataset.a].fn());
   // every step: replay it, or skip to the next one
