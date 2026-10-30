@@ -357,7 +357,7 @@ function render(tree,{layerFrom=-1,anim=null,dy=0,from=null,scroll=null,hs=null,
     else root.appendChild(el);});
   const old=CUR&&CUR.parentNode===screen?CUR:screen.lastChild;CUR=root;const EASE='cubic-bezier(.32,.72,0,1)';
   const drop=(el,ms)=>setTimeout(()=>el&&el.remove(),ms);
-  if(old&&over){old.style.pointerEvents='none';screen.appendChild(root);root._under=old;}
+  if(old&&over){old.style.pointerEvents='none';old.style.isolation='isolate';root.style.isolation='isolate';screen.appendChild(root);root._under=old;}
   else if(old&&anim==='push'){ // iOS push: new page from the right, old page drifts left under a light shade
     screen.appendChild(root);root.style.boxShadow='-8px 0 24px rgba(0,0,0,.12)';root.style.transform='translateX(100%)';
     const shade=document.createElement('div');shade.className='n pshade';shade.style.cssText='left:0;top:0;right:0;bottom:0;background:#000;opacity:0;transition:opacity .38s;z-index:55';old.appendChild(shade);
@@ -381,6 +381,11 @@ function render(tree,{layerFrom=-1,anim=null,dy=0,from=null,scroll=null,hs=null,
       requestAnimationFrame(()=>{dim.style.transition='opacity .26s';dim.style.opacity=0;
       rest.forEach(e=>{e.style.transition=`transform .3s ${EASE}`;e.style.transform=`translateY(${px(dy)})`;});});}
     drop(old,340);if(old._under){old._under.style.visibility='hidden';drop(old._under,340);}}
+  else if(old&&anim==='reveal'){ // close the image viewer: the page below is already there; the viewer fades and settles back, the sheet eases up a touch
+    old.style.pointerEvents='none';screen.insertBefore(root,old);const ly=root.querySelector(':scope > .layer');
+    if(ly){ly.style.transform=`translateY(${px(10)})`;}
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{const T='.32s cubic-bezier(.2,.8,.2,1)';old.style.transition=`opacity .26s ease-out,transform ${T}`;old.style.opacity=0;old.style.transform='scale(.96)';
+      if(ly){ly.style.transition=`transform ${T}`;ly.style.transform='none';}}));drop(old,360);}
   else if(old&&anim==='fade'){old.style.pointerEvents='none';screen.appendChild(root);root.style.opacity=0;
     requestAnimationFrame(()=>requestAnimationFrame(()=>{root.style.transition='opacity .18s ease-out';root.style.opacity=1;}));drop(old,220);}
   else{screen.innerHTML='';screen.appendChild(root);}
@@ -496,8 +501,8 @@ const AV={a516:'i19',deer:'i1'};
 const PATHS={
   A:{name:'找得到',who:'卡住了，想找做过的人怎么说',steps:['01 搜索：按晒过人数排','02 评论区顶部「大家晒的」','03 展开「大家晒的」，按类型筛','04 翻到底没找到，去搜']},
   B:{name:'等得到',who:'想问一句，又不想一直守着',steps:['05 看图有问答，打字提示相似提问','06 点「蹲」，等回答','07 有人答了，通知直达']},
-  C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 长按爱心选「有用」','11 收到「有用」与击掌']},
-  D:{name:'边界情况',who:'人少、不想被收、没匹配、图不实',steps:['12 晒的人很少：入口分级','13 不想被收进去：长按移出','14 没找到相似提问：不提示','15 晒的图不是真做的：举报']},
+  C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 看图页：长按爱心送「有用」','11 回看自己的图：表情雨','12 照着你做的人']},
+  D:{name:'边界情况',who:'人少、不想被收、没匹配、图不实',steps:['13 晒的人很少：入口分级','14 不想被收进去：长按移出','15 没找到相似提问：不提示','16 晒的图不是真做的：举报']},
 };
 let path='A',step=0;
 let RAIL_PATH=null;
@@ -532,7 +537,7 @@ function rail(){
   $('#mreplay').onclick=()=>end?start(path):jump(path,step);$('#mnext').onclick=()=>end?start(nk):step<steps.length-1?jump(path,step+1):endCard();
   if(!end)$('#replay').onclick=()=>jump(path,step); // desktop: the step list right below is the way forward, so only replay here
   if(end)$('#macts').innerHTML='';
-  // progress across all 15 steps
+  // progress across all steps
   const before=KS.slice(0,KS.indexOf(path)).reduce((n,k)=>n+PATHS[k].steps.length,0),total=KS.reduce((n,k)=>n+PATHS[k].steps.length,0),cur=before+Math.min(step+1,steps.length);
   const CH=d=>`<svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="${d?'M1.5 1.5L5.5 6l-4 4.5':'M5.5 1.5L1.5 6l4 4.5'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   // progress is the bar below; the header only switches step, both ways
@@ -550,7 +555,7 @@ let TIP='',ACTS=[];const go=(n,tip,acts)=>{step=n;if(tip!=null)TIP=tip;ACTS=(act
 let noteT,NOTE='';function mmsg(){const el=$('#mmsg');if(!el)return;el.innerHTML=NOTE?`<span class="mnote">${NOTE}</span>`:(step>=PATHS[path].steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP);}
 function note(msg){clearTimeout(noteT);NOTE=msg;const tn=$('#tipnote');if(tn)tn.textContent=msg;mmsg();if(msg)noteT=setTimeout(()=>note(''),2200);}
 function endCard(){const next={A:'B',B:'C',C:'D',D:'A'}[path];
-  const msg={A:'按晒过的人数挑笔记，在「大家晒的」里按类型筛出经验；楼里没有，再顺手去搜。',B:'提问前先看相似提问；还没人答就「蹲」着，有人回答才通知。',C:'在评论里顺手晒图，被帮到的人点「有用」，消息里能看到帮到了谁。',D:'人少时入口不硬凑；晒的人自己能移出、限制可见；没匹配就不打扰；不实的晒图走举报。'}[path];
+  const msg={A:'按晒过的人数挑笔记，在「大家晒的」里按类型筛出经验；楼里没有，再顺手去搜。',B:'提问前先看相似提问；还没人答就「蹲」着，有人回答才通知。',C:'在评论里顺手晒图；看的人用表情回应，晒的人回看时能感受到，也找得到照着自己做的人。',D:'人少时入口不硬凑；晒的人自己能移出、限制可见；没匹配就不打扰；不实的晒图走举报。'}[path];
   step=PATHS[path].steps.length;TIP=`路径 ${path} 走完了：${msg}`;ACTS=[{label:'重来一遍',fn:()=>start(path)},{label:`下一段：${PATHS[next].name}`,pri:1,fn:()=>start(next)}];note('');rail();}
 const idxOf=(t,o)=>t.c.indexOf(o);
 const overlayIdx=(t,nth=0)=>{let n=0;for(let i=0;i<t.c.length;i++){const o=t.c[i];if(o.w>=259&&o.h>=565&&o.f&&o.f[0].c&&o.f[0].c.startsWith('rgba(0,0,0')){if(n++===nth)return i;}}return -1;};
@@ -828,86 +833,218 @@ function s08(){go(0,'正在输入…');const t=clone('s08');const oi=t.c.findInd
     else{send._el.style.transition='opacity .2s';send._el.style.opacity=1;go(0,'点「发送」');hot(send,()=>s09(),{pad:4,label:'发送'});}};
   setTimeout(tick,420);}
 /* C9 posted, pinned on top */
-function s09(){go(1,'晒好啦，你的图置顶在最上面');const t=clone('s09');const oi=overlayIdx(t);const DISMISS=1;
+function s09(o={}){if(o.mine)go(3,'通知直达你晒的那条：点开你的图，看看大家的回应');else go(1,o.quiet?'往下看到 516 晒的也帮到了你：点开 TA 的图':'晒好啦，你的图置顶在最上面');const t=clone('s09');const oi=overlayIdx(t);
   const tbg=t.c.find(o=>o.f&&o.f[0].c==='rgba(0,0,0,0.75)');const ttx=byText(t,'晒好啦')[0];
   tbg.op=ttx.op=0;
-  render(t,{layerFrom:oi,anim:'dismiss',dy:FH-207});
-  const H=317.56-162.98;const isBar=o=>o.y>=501&&(o.w>200||(o.w>80&&o.h<4));
-  t.c.forEach((o,i)=>{if(i<=oi||!o._el||o===tbg||o===ttx||isBar(o))return;
+  render(t,o.quiet?{layerFrom:oi,anim:o.back?'reveal':'fade'}:{layerFrom:oi,anim:'dismiss',dy:FH-207});
+  const isBar=o=>o.y>=501&&(o.w>200||(o.w>80&&o.h<4));
+  if(!o.quiet){t.c.forEach((o,i)=>{if(i<=oi||!o._el||o===tbg||o===ttx||isBar(o))return;
     if(o.y>=155&&o.y<310)o._el.classList.add('newitem');});
-  [tbg,ttx].forEach(o=>{o._el.style.transition='opacity .2s';setTimeout(()=>o._el.style.opacity=1,120);setTimeout(()=>o._el.style.opacity=0,1760);});
-  // C10: long-press someone else's heart -> reactions picker (same picker as screen 10)
-  const me=CUR;setTimeout(()=>{if(CUR===me)go(2,'看到 516 晒的也帮到了你：长按它的爱心');},1600);
+    [tbg,ttx].forEach(o=>{o._el.style.transition='opacity .2s';setTimeout(()=>o._el.style.opacity=1,120);setTimeout(()=>o._el.style.opacity=0,1760);});
+    const me=CUR;setTimeout(()=>{if(CUR===me)go(1,'晒好啦。往下看到 516 晒的也帮到了你：点开 TA 的图');},1600);}
+  if(o.mine){ // from the notification: your comment is located (grey flash, as for any comment link), and its heart shows what you got
+    const bgEl=document.createElement('div');bgEl.className='n locflash';bgEl.style.cssText=`left:0;top:${px(155.2)};width:${px(FW)};height:${px(152)};z-index:0`;const lay=CUR.querySelector(':scope > .layer');const sheetBg=t.c[oi+1]&&t.c[oi+1]._el;if(sheetBg&&sheetBg.parentNode)sheetBg.parentNode.insertBefore(bgEl,sheetBg.nextSibling);
+    const mh=t.c.find(o=>o.n==='ic/c-heart'&&o.y>284&&o.y<287);if(mh&&mh._el){const par=mh._el.parentNode;mh._el.style.visibility='hidden';const D=11.2,ST=9.2,cy=mh._ay+mh.h/2,right=mh._ax+mh.w-.4;
+      ['flower','heart','bulb'].forEach((k,ri)=>{const i=2-ri;const d=dv('',`left:${px(right-D-(2-i)*ST)};top:${px(cy-D/2)};width:${px(D)};height:${px(D)}`,par);d.innerHTML=BSVG(k,{w:(D*K).toFixed(1),sc:.8});});
+      const c=dv('',`left:${px(218.6)};top:${px(mh._ay+.3)};height:${px(12)};line-height:${px(12)};font-size:${px(8.41)};color:#666;white-space:nowrap`,par);c.textContent='23';}
+    const h5=t.c.find(o=>o.n.startsWith('ic/c-heart')&&o.y>439&&o.y<441);if(h5&&h5._el){h5._el.innerHTML=BSVG('bulb',{w:(h5.w*K).toFixed(2)});}
+    const myPh=t.c.find(o=>o.t==='RE'&&o.f&&o.f[0].img==='i23'&&Math.abs(o.w-82.8)<1);if(myPh)hot(myPh,()=>ownViewer(),{pad:0,label:'看你晒的图'});
+    return;}
+  // 516's photo opens the viewer (the step); its heart can also be held right here, with the same reactions
+  const ph=t.c.find(o=>o.t==='RE'&&o.f&&o.f[0].img==='i8'&&Math.abs(o.w-82.8)<1);if(ph)hot(ph,()=>viewer516(),{pad:0,label:'看 516 晒的图'});
   const heart=t.c.find(o=>o.n.startsWith('ic/c-heart')&&o.y>439&&o.y<441);const cnt=t.c.find(o=>txt(o)==='10'&&o.y>440&&o.y<442);
-  // 516's heart shown unliked before the action
-  const plain=t.c.find(o=>o.n==='ic/c-heart'&&o.svg);const R={heart,cnt,kind:null,outline:node(plain).innerHTML,liked:SVGS[heart.svg],first:true};
-  heart._el.innerHTML=R.outline;cnt._el.firstChild.textContent='9';
-  // 516's 课代表 badge (the one on the row above this heart) turns into 关注 once you mark it 「有用」
+  const plain=t.c.find(o=>o.n==='ic/c-heart'&&o.svg);const R={heart,cnt,kind:null,ax:heart._ax+heart.w/2,ay:heart._ay,par:heart._el.parentNode};
+  heart._el.innerHTML=node(plain).innerHTML;cnt._el.firstChild.textContent='9';
+  // 516's 课代表 badge: 「关注」 shows up beside it once you mark it 「有用」
   const bdg=t.c.filter(o=>o.n==='badge · 课代表'&&o._el&&o._ay<heart._ay).sort((a,b)=>b._ay-a._ay)[0];
   if(bdg)R.onKind=k=>followSwap(bdg,k==='bulb');
+  R.onChoose=k=>{reactRow(R,k);if(k==='bulb')note('516 会知道帮到了你；点开 TA 的图，回应会更大');};
   heart._nolike=1;const h=hot(heart,()=>{},{pad:7,label:'长按爱心'});h.style.touchAction='none';holdPicker(h,R);}
-/* filled 「有用」 bulb: same outline as the picker icon, filled the way the liked heart is */
 const BULB_ON=`<svg width="18" height="18" viewBox="1 -0.6 16 16" fill="none"><path d="M8.55014 2.56475C7.65537 2.55416 6.78057 2.82936 6.05302 3.35032C5.32547 3.87127 4.78314 4.6108 4.50495 5.46129C4.22675 6.31177 4.2272 7.22884 4.50624 8.07905C4.78527 8.92927 5.32833 9.66826 6.05639 10.1885C6.48389 10.5447 6.76889 11.0435 6.76889 11.6135V12.1122H10.3314V11.6135C10.3314 11.0435 10.6164 10.5447 11.0439 10.1885C11.7719 9.66826 12.315 8.92927 12.594 8.07905C12.8731 7.22884 12.8735 6.31177 12.5953 5.46129C12.3171 4.6108 11.7748 3.87127 11.0473 3.35032C10.3197 2.82936 9.44491 2.55416 8.55014 2.56475Z" fill="#FFB800" stroke="#FFB800" stroke-width="1.14" stroke-linejoin="round"/><path d="M6.98242 14.25H10.1174" stroke="#FFB800" stroke-width="1.14" stroke-linecap="round"/><path d="M8.54999 9.68969V7.40969M8.54999 7.40969L7.55249 6.55469M8.54999 7.40969L9.54749 6.55469" stroke="#fff" stroke-width="1.14" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/* ---------- reactions: 有用 / 爱了 / 学到了 / 送花 (drawn in the app's emoji style; same set in comments and in the image viewer) ---------- */
+let EID=0;
+const SPK=(x,y,s)=>`<path d="M${x} ${y-s} l${s*.36} ${s*.64} l${s*.64} ${s*.36} l-${s*.64} ${s*.36} l-${s*.36} ${s*.64} l-${s*.36} -${s*.64} l-${s*.64} -${s*.36} l${s*.64} -${s*.36}z" fill="#FFD23F"/>`;
+const HLP=(d,w=4.5,o=.85)=>`<path d="${d}" stroke="#fff" stroke-width="${w}" stroke-linecap="round" fill="none" opacity="${o}"/>`;
+const EMO_SRC={
+  bulb:(i,sp)=>`<defs><linearGradient id="g${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF3A6"/><stop offset=".55" stop-color="#FFD64A"/><stop offset="1" stop-color="#FFB21C"/></linearGradient><linearGradient id="m${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4F4F7"/><stop offset="1" stop-color="#B4B4C0"/></linearGradient></defs><path d="M48 12 C31 12 19 25 19 41 C19 52 25 59.5 31 64.5 L32.5 71 L63.5 71 L65 64.5 C71 59.5 77 52 77 41 C77 25 65 12 48 12Z" fill="url(#g${i})" stroke="#9C5A00" stroke-width="4" stroke-linejoin="round"/>${HLP('M30 36 Q32 25 42 21',5,.9)}<circle cx="29" cy="45" r="2.8" fill="#fff" opacity=".9"/><path d="M39 46 L48 55 L57 46 M48 55 V68" stroke="#E08600" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="32" y="70" width="32" height="10" rx="4.5" fill="url(#m${i})" stroke="#6B6B78" stroke-width="3.5"/><rect x="37" y="79" width="22" height="8" rx="4" fill="url(#m${i})" stroke="#6B6B78" stroke-width="3.5"/>${sp?SPK(82,14,5.5)+SPK(12,22,3.6):''}`,
+  heart:(i,sp)=>`<defs><linearGradient id="h${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF9DB0"/><stop offset=".55" stop-color="#FF4D6D"/><stop offset="1" stop-color="#F0204A"/></linearGradient></defs><path d="M48 82 C26 67 12 54 12 37 C12 25 21 16 32 16 C39 16 44.5 20 48 25.5 C51.5 20 57 16 64 16 C75 16 84 25 84 37 C84 54 70 67 48 82Z" fill="url(#h${i})" stroke="#B0123A" stroke-width="4" stroke-linejoin="round"/>${HLP('M22 34 Q23 25 31 23',5,.9)}<circle cx="22" cy="42" r="2.6" fill="#fff" opacity=".9"/>${sp?SPK(84,12,5.5)+SPK(10,70,3.6):''}`,
+  book:(i,sp)=>`<defs><linearGradient id="c${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFA88F"/><stop offset="1" stop-color="#FF6A55"/></linearGradient><linearGradient id="p${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#FFF0D6"/></linearGradient></defs><path d="M10 34 Q30 28 48 38 Q66 28 86 34 L86 80 Q66 74 48 84 Q30 74 10 80Z" fill="url(#c${i})" stroke="#B5452E" stroke-width="4" stroke-linejoin="round"/><path d="M48 34 Q32 23 15 27 L15 73 Q32 69 48 78Z" fill="url(#p${i})" stroke="#B5452E" stroke-width="3.6" stroke-linejoin="round"/><path d="M48 34 Q64 23 81 27 L81 73 Q64 69 48 78Z" fill="url(#p${i})" stroke="#B5452E" stroke-width="3.6" stroke-linejoin="round"/><path d="M23 40 Q32 37.5 41 41 M23 50 Q32 47.5 41 51 M23 60 Q30 58 36 60 M55 41 Q64 37.5 73 40 M55 51 Q64 47.5 73 50" stroke="#F2C77E" stroke-width="3" stroke-linecap="round" fill="none"/>${HLP('M20 33 Q26 30.5 32 31',3.5,.95)}${sp?SPK(48,14,7)+SPK(70,16,3.6)+SPK(27,15,3.2):''}`,
+  flower:(i,sp)=>{const pet=(st)=>[0,1,2,3,4].map(k=>`<ellipse cx="48" cy="27.5" rx="16.5" ry="20.5" transform="rotate(${k*72} 48 49)" fill="url(#f${i})" ${st?'stroke="#C21E55" stroke-width="6" stroke-linejoin="round"':''}/>`).join('');
+    return `<defs><radialGradient id="f${i}" cx="48" cy="49" r="44" gradientUnits="userSpaceOnUse"><stop offset="0.2" stop-color="#FF4A78"/><stop offset="0.65" stop-color="#FF7E9E"/><stop offset="1" stop-color="#FFB3C6"/></radialGradient><radialGradient id="o${i}" cx="45" cy="45" r="13" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFF6C2"/><stop offset="1" stop-color="#FFC94A"/></radialGradient></defs>${pet(true)}${pet(false)}${[0,1,2,3,4].map(k=>`<path d="M48 39 L48 24" transform="rotate(${k*72} 48 49)" stroke="#E8336A" stroke-width="2.2" stroke-linecap="round" opacity=".35"/>`).join('')}<circle cx="48" cy="49" r="10" fill="url(#o${i})" stroke="#F0A23A" stroke-width="1.8"/>${HLP('M38.5 14.5 Q42.5 10.5 48 10.5',4)}${HLP('M17.5 38 Q17 33 20 29.5',3.2,.7)}${sp?SPK(86,14,5.5)+SPK(10,80,3.6):''}`;}};
+function EMO(k,{w=24,sp=false}={}){const i=++EID;return `<svg width="${w}" height="${w}" viewBox="0 0 96 96" fill="none" style="overflow:visible;display:block">${EMO_SRC[k](i,sp)}</svg>`;}
+/* a reaction always sits on a round badge (light on the comment list, dark in the viewer), like an avatar */
+function BSVG(k,{w=12,bg='#f2f2f2',ring='#ffffff',sc=.78}={}){const i=++EID,o=48-48*sc;return `<svg width="${w}" height="${w}" viewBox="0 0 96 96" fill="none" style="overflow:visible;display:block"><circle cx="48" cy="48" r="58" fill="${bg}" stroke="${ring}" stroke-width="10"/><g transform="translate(${o} ${o}) scale(${sc})">${EMO_SRC[k](i,false)}</g></svg>`;}
+const KINDS=['bulb','heart','book','flower'],KLABEL={bulb:'有用',heart:'爱了',book:'学到了',flower:'送花'},KCOL={bulb:'#FFB800',heart:'#FF2442',book:'#FF6A55',flower:'#FF4A78'};
+// 516's heart in the base screen was the old red 「已赞」; with reactions, a reaction you gave shows on a badge, so the base state is a plain heart
+(function f(t){if(t.n==='ic/c-heart · 已赞')t.svg='v18';(t.c||[]).forEach(f);})(SCREENS.s09);
+for(let i=0;i<=25;i++){const im=new Image();im.src=`img/i${i}.jpg`;}
+const REDUCED=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dv=(cls,css,par)=>{const d=document.createElement('div');d.className='n '+(cls||'');d.style.cssText=css;(par||CUR).appendChild(d);return d;};
+
+/* a reaction floats up from where it was sent: pops in, rises and fades, two smaller copies trail behind */
+function floatUp(cx,cy,kind,size,par,RISE,DUR=950){if(REDUCED())return;par=par||CUR;
+  [[1,0,0],[.55,110,-.32],[.36,200,.36]].forEach(([s,delay,dx])=>{const w=size*s;const d=dv('',`left:${px(cx-w/2+dx*size)};top:${px(cy-w/2)};width:${px(w)};height:${px(w)};z-index:48;pointer-events:none;opacity:0`,par);d.innerHTML=EMO(kind,{w:(w*K).toFixed(1),sp:s===1});
+    const rise=(RISE||size*1.15)*(s===1?1:1.3),rot=s===1?-8:(dx>0?10:-10);
+    d.animate([{opacity:0,transform:'translateY(0) scale(.3) rotate(0deg)'},{opacity:1,transform:`translateY(${px(-rise*.12)}) scale(1.14) rotate(${rot}deg)`,offset:.22},{opacity:1,transform:`translateY(${px(-rise*.35)}) scale(1) rotate(${rot}deg)`,offset:.5},{opacity:0,transform:`translateY(${px(-rise)}) scale(.92) rotate(${rot}deg)`}],{duration:DUR,delay:delay*DUR/950,easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'}).onfinish=()=>d.remove();});}
+
 /* press and hold -> picker opens; keep holding and slide across to switch, release on one to choose.
    A quick release leaves the picker open so it can also be tapped. Holding again later lets you switch reactions. */
-function holdPicker(h,R){let tm=null,P=null;const H=R.heart._el;
+function holdPicker(h,R){let tm=null,P=null;const HE=()=>(R.pressFn?R.pressFn():R.heart._el)||document.createElement('i');
   const at=e=>(P?P.items:[]).find(it=>{const r=it.b.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top-6&&e.clientY<=r.bottom+6;});
   const hover=it=>(P?P.items:[]).forEach(x=>x.ic.classList.toggle('hov',x===it));
   h.addEventListener('contextmenu',e=>e.preventDefault());
-  h.addEventListener('pointerdown',e=>{e.preventDefault();try{h.setPointerCapture(e.pointerId);}catch(_){}H.classList.add('heartpress');
-    tm=setTimeout(()=>{tm=null;H.classList.remove('heartpress');P=picker(R);P.holding=true;},420);});
+  h.addEventListener('pointerdown',e=>{e.preventDefault();try{h.setPointerCapture(e.pointerId);}catch(_){}HE().classList.add('heartpress');
+    tm=setTimeout(()=>{tm=null;HE().classList.remove('heartpress');P=picker(R);P.holding=true;},420);});
   h.addEventListener('pointermove',e=>{if(P&&P.holding)hover(at(e));});
-  const end=e=>{H.classList.remove('heartpress');if(tm){clearTimeout(tm);tm=null;if(e.type==='pointerup')note(R.kind?'长按可以换一个':'要长按，不是点一下');return;}
+  const end=e=>{HE().classList.remove('heartpress');if(tm){clearTimeout(tm);tm=null;if(e.type==='pointerup')note(R.kind?'长按可以换一个':'要长按，不是点一下');return;}
     if(P&&P.holding){P.holding=false;const it=at(e);hover(null);if(it)P.choose(it.o);}};
   h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);}
-function picker(R){const {heart,cnt}=R;if(R.first)go(2,'按住不放，滑到小灯泡上松手，表示「有用」；松手后再点也可以');
-  const s10=clone('s10');const pk=s10.c.find(o=>o.n==='反应选择 · 长按爱心');
-  // same offset to the heart as in screen 10
-  pk.x=heart._ax-(203.73-117.83);pk.y=heart._ay-(350.87-319.51);
-  const el=node(pk);el.style.left=px(pk.x);el.style.top=px(pk.y);el.style.zIndex=50;el.classList.add('pkbox');CUR.appendChild(el);
-  walk(pk,()=>{});const bulb=pk.c.find(o=>o.n==='ic/有用 · 灯泡'),hrt=pk.c.find(o=>o.n==='ic/heart');
-  // icons pop in one after another
-  pk.c.forEach((o,i)=>{if(o._el&&o.svg){o._el.classList.add('pkic');o._el.style.animationDelay=(40+i*35)+'ms';}});
-  const P={holding:false,items:[]};
-  let done=false;const shut=()=>{document.removeEventListener('pointerdown',close,true);el.classList.add('out');setTimeout(()=>el.remove(),160);};
+/* the picker: one white bar with the four reactions, opening just above the heart that was held */
+function picker(R){const IW=19,GAP=6.4,PADX=10,H=27.6,W=PADX*2+IW*4+GAP*3;
+  const x=Math.max(6,Math.min(FW-W-6,R.ax-W+14)),y=R.ay-H-8;
+  const el=dv('pkbox',`left:${px(x)};top:${px(y)};width:${px(W)};height:${px(H)};border-radius:${px(H/2)};background:#fff;box-shadow:0 ${px(2.5)} ${px(10)} rgba(0,0,0,.14),inset 0 0 0 ${px(.5)} #ebebeb;z-index:50;transform-origin:${((R.ax-x)/W*100).toFixed(0)}% 100%`,R.par||CUR);
+  const P={holding:false,items:[]};let done=false;
+  const shut=()=>{document.removeEventListener('pointerdown',close,true);el.classList.add('out');setTimeout(()=>el.remove(),160);};
   const close=e=>{if(!el.contains(e.target)&&!done&&!P.holding){done=true;shut();}};
   setTimeout(()=>document.addEventListener('pointerdown',close,true),60);
-  P.choose=o=>{if(done)return;const kind=o===bulb?'bulb':o===hrt?'heart':null;
-    if(!kind)return note(R.first?'这一步选小灯泡「有用」':'这个 Demo 里可以在爱心和「有用」之间切换');
-    done=true;shut();react(R,kind);
-    if(kind==='bulb'&&R.first){R.first=false;go(2,'点好了，516 会知道帮到了你；「课代表」旁边多了「关注」，可以顺手关注靠谱的过来人');setTimeout(()=>{go(3,'过了一会儿，有人回应了你晒的图：点顶部的通知');banner(AV.deer,'小鹿','照着你晒的做成了','还有 6 人觉得你晒的有用',s11);},3600);}
-    else if(R.first)note('这一步要选小灯泡「有用」：再长按，换成小灯泡');};
-  pk.c.forEach(o=>{if(!o.svg)return;const b=document.createElement('button');b.className='hot';b.style.cssText=`left:${px(o.x-4)};top:${px(o.y-4)};width:${px(o.w+8)};height:${px(o.h+8)}`;b.setAttribute('aria-label',o.n.replace('ic/',''));el.appendChild(b);
-    const ic=o._el;P.items.push({o,b,ic});
+  P.choose=k=>{if(done)return;done=true;const i=KINDS.indexOf(k);R.from={x:x+PADX+i*(IW+GAP)+IW/2,y:y+H/2};shut();R.onChoose(k);};
+  KINDS.forEach((k,i)=>{const ix=PADX+i*(IW+GAP),iy=(H-IW)/2;
+    const ic=dv('pkic',`left:${px(ix)};top:${px(iy)};width:${px(IW)};height:${px(IW)};animation-delay:${40+i*35}ms`,el);ic.innerHTML=EMO(k,{w:(IW*K).toFixed(1)});
+    const b=document.createElement('button');b.className='hot';b.style.cssText=`left:${px(ix-3)};top:${px(iy-3)};width:${px(IW+6)};height:${px(IW+6)}`;b.setAttribute('aria-label',KLABEL[k]);el.appendChild(b);
+    P.items.push({o:k,b,ic});
     b.onpointerenter=()=>{if(!P.holding)ic.classList.add('hov');};b.onpointerleave=()=>ic.classList.remove('hov','press');
-    b.onpointerdown=()=>ic.classList.add('press');b.onpointerup=()=>ic.classList.remove('press');
-    b.onclick=()=>P.choose(o);});
+    b.onpointerdown=()=>ic.classList.add('press');b.onpointerup=()=>ic.classList.remove('press');b.onclick=()=>P.choose(k);});
   return P;}
-/* the reaction lands like the app's like: old icon shrinks away, the filled one springs in with a ring and three sparks, the count rolls */
-const FOL_STAY=4000,FOL_DONE=1200; // 关注 waits a few seconds then fades; 已关注 confirms, then fades
+/* 关注 next to 课代表: appears after 「有用」, fades on its own; tapping it confirms and fades */
+const FOL_STAY=4000,FOL_DONE=1200;
 function followSwap(b,on){const el=b._el;let f=b._fol;
   const fade=ms=>{clearTimeout(b._h);b._h=setTimeout(()=>f.classList.add('gone'),ms);};
   if(!f){f=b._fol=document.createElement('button');f.className='fol off';f.setAttribute('aria-label','关注 516');
     f.style.cssText+=`;left:${px(parseFloat(el.style.left)/K+b.w+3.5)};top:${px(b.y-1)};height:${px(b.h+2)};font-size:${px(6.6)};line-height:${px(b.h+2)}`;
     f.textContent='关注';el.parentNode.appendChild(f);
     f.onclick=e=>{e.stopPropagation();if(b._followed)return;b._followed=true;f.textContent='已关注';f.style.color='#999';note('关注了 516，之后能在关注里看到 TA 晒的');fade(FOL_DONE);};}
-  if(b._followed)return; // once followed it is done, whichever reaction you switch to
+  if(b._followed)return;
   clearTimeout(b._t);clearTimeout(b._h);
-  b._t=setTimeout(()=>{f.classList.remove('gone');f.classList.toggle('off',!on);if(on)fade(FOL_STAY);},on?260:0);} // after the bulb has landed
-function react(R,kind){const {heart,cnt}=R;if(R.kind===kind)return;const had=!!R.kind;R.kind=kind;R.onKind&&R.onKind(kind);
-  likeAnim(heart,kind==='bulb'?{svg:BULB_ON,col:'#FFB800',dx:1.1,sparks:true,count:had?null:()=>cnt._el.firstChild.textContent='10'}:{svg:R.liked,count:had?null:()=>cnt._el.firstChild.textContent='10'});}
-/* C11 notifications */
-function s11(){go(3,'点「击掌」回应小鹿');const t=clone('s11');render(t,{anim:'push'});backBtn(t);pageLoading();
-  const clap=find(t,o=>o.tx&&txt(o)==='击掌')[0];const pill=clap._p;const emo=pill.c.find(k=>k!==clap&&k.tx);
-  // the emoji is drawn wider in the browser than in Figma: keep a real gap after it, and the pill's right padding as in Figma
-  const pad=pill.w-(clap.x+clap.w),GAP=3.2;
-  const lay=(anim)=>{const sp=clap._el.firstChild,cs=getComputedStyle(sp);cv.font=`${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    const es=emo&&emo._el&&emo._el.firstChild,ew=es?es.getBoundingClientRect().width/K:8;const x=(emo?emo.x:7.91)+ew+GAP;
-    clap._el.style.left=px(x);const nw=px(x+cv.measureText(sp.textContent).width/K+pad);
-    [pill._el,pill._p&&pill._p._el].forEach(e=>{if(e){e.style.transition=anim?'width .2s':'none';e.style.width=nw;}});};
-  lay(false);if(document.fonts)document.fonts.ready.then(()=>{if(clap._el.isConnected)lay(false);});
-  let done=false;hot(pill,()=>{if(done)return;done=true;const sp=clap._el.firstChild;sp.textContent='已击掌';sp.style.color='#999999';lay(true);
-    setTimeout(endCard,500);},{pad:3,label:'击掌'});}
+  b._t=setTimeout(()=>{f.classList.remove('gone');f.classList.toggle('off',!on);if(on)fade(FOL_STAY);},on?260:0);}
+/* a reaction on a comment row: the heart turns into the chosen reaction, which also floats up a little, like in the viewer */
+function reactRow(R,kind){const {heart,cnt}=R;if(R.kind===kind)return;const had=!!R.kind;R.kind=kind;R.onKind&&R.onKind(kind);
+  likeAnim(heart,{svg:BSVG(kind,{w:13}),col:KCOL[kind],sparks:kind==='bulb',count:had?null:()=>cnt._el.firstChild.textContent='10'});
+  const f=R.from||{x:heart._ax+heart.w/2,y:heart._ay-6};setTimeout(()=>floatUp(f.x,f.y,kind,30,R.par||heart._el.parentNode),60);}
+
+/* ---------- the image viewer (same UI as the app's: black, back, 「＋ 我也发一个」, the photo, name + words, reply bar, reactions) ---------- */
+let VT=null;const V={cy:494.6,fs:8.8,bar:{x:5.65,y:512.5,w:187,h:25},right:FW-10.7};
+const IC_IMG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#707070" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15.5l-5-5L5 21"/></svg>';
+const IC_AT='<svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="#707070" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.9 7.9"/></svg>';
+function viewerTree({img,av,name,badge,caption,reply}){const fs=V.fs,cy=V.cy,c=[];
+  const s9=SCREENS.s09.c;const tm=JSON.parse(JSON.stringify(s9[0]));tm.tx[0][4]='#ffffff';c.push(tm);
+  c.push({t:'FR',x:s9[1].x,y:s9[1].y,w:s9[1].w,h:s9[1].h,n:'status',svg:'v0',svgx:SVGS.v0.replace(/#111111/gi,'#ffffff')});
+  c.push({t:'IN',x:11.64,y:53.04,w:6.47,h:10.35,n:'ic/back',svg:'v1',svgx:SVGS.v1.replace(/fill="#[0-9a-f]{3,6}"/gi,'fill="#ffffff"')});
+  c.push({t:'RE',x:182.6,y:45.5,w:69,h:19,n:'mine pill',f:[{c:'#262626'}],r:9.5});
+  c.push({t:'TE',x:182.6,y:45.5,w:69,h:19,n:'mine',tx:[['＋ 我也发一个',8.6,'Noto Sans SC','Medium','#ffffff',0,0]],al:'C',ar:'F',lt:1});
+  c.push({t:'RE',x:0,y:115.5,w:FW,h:FW,n:'photo',f:[{img}]});
+  c.push({t:'EL',x:8.8,y:cy-5.65,w:11.3,h:11.3,n:'av',f:[{img:av}],r:999});
+  const T=(s,x,col)=>{const o={t:'TE',x,y:cy-6.5,w:textW(s,fs,'Noto Sans SC',400)+.5,h:13,n:'vt',tx:[[s,fs,'Noto Sans SC','Regular',col,0,0]],al:'L',ar:'W',lt:1};c.push(o);return o;};
+  let x=23.2;const nm=T(name,x,'#999999');x+=nm.w;
+  if(badge){c.push({t:'FR',x:x+3,y:cy-4.3,w:31.6,h:8.6,n:'badge · 课代表'});x+=3+31.6;}
+  const co=T(':',x+1.2,'#999999');x=co.x+co.w+2.6;
+  const ex=textW('展开',fs,'Noto Sans SC',400),exX=V.right-ex,max=exX-5-x;let s=caption,fits=textW(s,fs,'Noto Sans SC',400)<=max;
+  if(!fits){while(s.length>1&&textW(s+'...',fs,'Noto Sans SC',400)>max)s=s.slice(0,-1);s=s.replace(/[，,。\s]+$/,'')+'...';}
+  T(s,x,'#ffffff');if(!fits)T('展开',exX,'#999999');
+  const b=V.bar;c.push({t:'RE',x:b.x,y:b.y,w:b.w,h:b.h,n:'reply bar',f:[{c:'#202020'}],r:b.h/2});
+  c.push({t:'TE',x:16,y:b.y,w:textW(reply,fs,'Noto Sans SC',400)+.5,h:b.h,n:'reply',tx:[[reply,fs,'Noto Sans SC','Regular','#9d9d9d',0,0]],al:'L',ar:'W',lt:1});
+  c.push({t:'FR',x:b.x+b.w-41,y:b.y+b.h/2-6,w:12,h:12,n:'ic img',svg:'x',svgx:IC_IMG});
+  c.push({t:'FR',x:b.x+b.w-20.5,y:b.y+b.h/2-6.25,w:12.5,h:12.5,n:'ic at',svg:'x',svgx:IC_AT});
+  c.push({t:'RE',x:86.7,y:556.2,w:86.7,h:3.2,n:'home',f:[{c:'#ffffff'}],r:1.6});
+  return {t:'FR',x:0,y:0,w:FW,h:FH,n:'viewer',f:[{c:'#000000'}],c};}
+/* bottom-right of the viewer: the heart before you react; after, round badges like avatars (yours first, then the most given) and the total */
+function stack(kinds,count,mine){const old=CUR.querySelector(':scope > .vstack');if(old)old.remove();
+  const cy=V.bar.y+V.bar.h/2,D=15.7,ST=10.4,box=dv('vstack',`left:0;top:0;width:0;height:0;z-index:30`);
+  const cw=textW(String(count),V.fs,'Noto Sans SC',400);const right=V.right;const cntX=right-cw;
+  if(mine)kinds=[mine];
+  if(!kinds.length){const w=13.5,x=cntX-3.5-w;const h=dv('',`left:${px(x)};top:${px(cy-w/2)};width:${px(w)};height:${px(w)}`,box);h.innerHTML=SVGS.v18.replace(/#8C8C8C/gi,'#d6d6d6').replace(/stroke-width="[\d.]+"/,'stroke-width="1"');const sv=h.firstChild;sv.setAttribute('width',(w*K).toFixed(1));sv.setAttribute('height',(w*K).toFixed(1));box._hit={x:x-6,w:right-x+12};}
+  else{const x0=cntX-3.8-D-(kinds.length-1)*ST;
+    for(let i=kinds.length-1;i>=0;i--){const x=x0+i*ST;const r=dv(mine?'vbadge likepop':'vbadge',`left:${px(x)};top:${px(cy-D/2)};width:${px(D)};height:${px(D)};border-radius:50%;background:#333;box-shadow:0 0 0 ${px(1.4)} #000;overflow:hidden`,box);
+      const s=D*.74;const ic=dv('',`left:${px((D-s)/2)};top:${px((D-s)/2)};width:${px(s)};height:${px(s)}`,r);ic.innerHTML=EMO(kinds[i],{w:(s*K).toFixed(1)});}
+    box._hit={x:x0-6,w:right-x0+12};}
+  const t=dv('vcnt',`left:${px(cntX)};top:${px(cy-6.5)};height:${px(13)};line-height:${px(13)};font-size:${px(V.fs)};color:#d6d6d6;white-space:nowrap`,box);t.textContent=String(count);
+  if(VT){const left=box._hit.x+6,bar=VT.c.find(o=>o.n==='reply bar'),im=VT.c.find(o=>o.n==='ic img'),at=VT.c.find(o=>o.n==='ic at');const w=left-8.5-bar.x,end=bar.x+w;
+    if(bar._el)bar._el.style.width=px(w);if(im&&im._el)im._el.style.left=px(end-41);if(at&&at._el)at._el.style.left=px(end-20.5);}
+  return box;}
+
+/* C10: 516's photo in the viewer; hold the heart, pick 「有用」, it floats up over the photo */
+function viewer516(){go(2,'长按右下角的爱心，滑到小灯泡「有用」上松手');
+  const t=viewerTree({img:'i8',av:AV.a516,name:'516',badge:true,caption:'交作业的来了，多炖了 10 分钟，肉更软',reply:'回复 @516'});
+  render(t,{anim:'fade'});VT=t;hotRect(0,40,44,32,()=>s09({quiet:true,back:true}),'返回');
+  const box=stack([],9);const cy=V.bar.y+V.bar.h/2;
+  const R={kind:null,ax:V.right-14,ay:V.bar.y,pressFn:()=>{const s=CUR.querySelector('.vstack');if(!s)return null;const bs=s.querySelectorAll('.vbadge');return bs.length?bs[bs.length-1]:s.firstChild;}};
+  R.onChoose=k=>{const first=!R.kind;R.kind=k;const f=R.from||{x:V.right-14,y:V.bar.y};floatUp(f.x,f.y,k,58,null,150,1500);
+    stack([],10,k);
+    if(k!=='bulb'){note('这一步选小灯泡「有用」：再长按，换成它');return;}
+    if(R.done)return;R.done=true;go(2,'送出了「有用」：516 会知道帮到了你，大灯泡飘过 TA 的图');
+    setTimeout(()=>{go(3,'过了一会儿，有人回应了你晒的图：点顶部的通知');banner(AV.deer,'小鹿','等 23 人回应了你晒的图','3 人照着你晒的做成了',()=>s09({mine:true,quiet:true}));},2600);};
+  const h=hotRect(box._hit.x,cy-14,box._hit.w,28,()=>{},'长按爱心');h.style.touchAction='none';holdPicker(h,R);}
+
+/* C11: back to your own photo: the reactions you got rain down once, then one line stays: who made it after you */
+function ownViewer(o={}){if(o.done)go(3,'点「3 人照着你做了」，看看是谁');
+  const t=viewerTree({img:'i23',av:'i21',name:'我',caption:'照着做好了，油留着炒肉真的香',reply:'回复 @我'});
+  render(t,{anim:o.done?null:'fade'});VT=t;hotRect(0,40,44,32,()=>s09({quiet:true,back:true}),'返回');stack(['bulb','heart','flower'],23);
+  let pilled=false;const pill=()=>{if(pilled)return;pilled=true;const y=442,h=25,avs=['i13','i14',AV.deer];const tx='3 人照着你做了 ›',tw=textW(tx,9.2,'Noto Sans SC',400);const w=8+15.5+8*2+6+tw+9;
+    const p=document.createElement('button');p.className='n vpill';p.setAttribute('aria-label','3 人照着你做了');p.style.cssText=`left:${px(8.8)};top:${px(y)};width:${px(w)};height:${px(h)};border-radius:${px(h/2)};background:rgba(255,255,255,.14);z-index:35;opacity:0;transform:translateY(${px(6)});transition:opacity .24s ease-out,transform .32s cubic-bezier(.2,.8,.3,1);padding:0;border:0`;
+    avs.forEach((a,i)=>{const e=dv('',`left:${px(8+i*8)};top:${px((h-15.5)/2)};width:${px(15.5)};height:${px(15.5)};border-radius:50%;background:url(img/${a}.jpg) center/cover;box-shadow:0 0 0 ${px(1.2)} #3a3a3a`,p);});
+    const s=dv('',`left:${px(8+15.5+16+6)};top:0;height:${px(h)};line-height:${px(h)};font-size:${px(9.2)};color:#fff;white-space:nowrap`,p);s.textContent=tx;
+    CUR.appendChild(p);requestAnimationFrame(()=>requestAnimationFrame(()=>{p.style.opacity=1;p.style.transform='none';}));p.onclick=()=>followers();
+    note('');TIP='点「3 人照着你做了」看看是谁';rail();};
+  if(!o.done&&REDUCED())go(3,'回看你晒的图：收到 23 个回应');
+  if(o.done||REDUCED())return pill();
+  go(3,'回看你晒的图：大家送的表情，从右下角一个个冒出来、往上飘');
+  const sb=CUR.querySelector(':scope > .vstack'),cnt=sb.querySelector('.vcnt'),front=[...sb.querySelectorAll('.vbadge')].pop();cnt.textContent='0';
+  // the badges and the total ease in first (front one first), so the stream starts from something that arrived softly
+  [...sb.querySelectorAll('.vbadge')].reverse().forEach((bd,i)=>bd.animate([{opacity:0,transform:'scale(.85)'},{opacity:1,transform:'none'}],{duration:700,delay:60+i*110,easing:'cubic-bezier(.33,0,.2,1)',fill:'both'}));
+  cnt.animate([{opacity:0},{opacity:1}],{duration:600,delay:120,easing:'cubic-bezier(.33,0,.2,1)',fill:'both'});
+  const bag=[].concat(...[['bulb',5],['heart',4],['flower',4],['book',3]].map(([k,n])=>Array(n).fill(k)));bag.sort(()=>Math.random()-.5);
+  const TOTAL=23,root=CUR,sx=V.right-30,sy=V.bar.y+V.bar.h/2;let lastEnd=0;
+  const OUT='cubic-bezier(.22,1,.36,1)',DRIFT='cubic-bezier(.45,0,.55,1)';
+  const at=(X,Y,r,sc=1)=>`translate(${px(X)},${px(Y)}) rotate(${r}deg) scale(${sc})`;
+  const mk=(k,s,x,y)=>{const d=dv('',`left:${px(x)};top:${px(y)};width:${px(s)};height:${px(s)};z-index:34;pointer-events:none;will-change:transform,opacity`,root);d.innerHTML=EMO(k,{w:(s*K).toFixed(1)});return d;};
+  // like hearts in a live room: they come out of the badges one at a time, drift up with a gentle sway and fade; unhurried
+  const list=bag.slice(0,11),N=list.length,STEP=170;
+  // the total runs up smoothly over the whole stream (no step per emoji), easing out as the last ones leave
+  const t0=performance.now()+320,DUR=N*STEP+900;const tick=now=>{if(!root.isConnected)return;const p=Math.min(1,Math.max(0,(now-t0)/DUR)),e=1-Math.pow(1-p,2.2);cnt.textContent=String(Math.round(e*TOTAL));if(p<1)requestAnimationFrame(tick);};requestAnimationFrame(tick);
+  list.forEach((k,i)=>{const s=17+Math.random()*10,x=sx-s/2+(Math.random()*2-1)*5,y=sy-s/2,up=165+Math.random()*95,sw=(i%2?-1:1)*(9+Math.random()*12),delay=320+i*STEP+(Math.random()*2-1)*40,T=2700+Math.random()*400;
+    const d=mk(k,s,x,y);
+    // sampled from one smooth path (steady rise, soft sway, gentle fade/scale in and out), played linearly: no pop at the start
+    const ss=t=>t<=0?0:t>=1?1:t*t*(3-2*t),KF=[];for(let q=0;q<=28;q++){const p=q/28,yy=-up*(p*.85+.15*(1-Math.pow(1-p,2))),xx=sw*Math.sin(p*Math.PI*1.3),sc=.82+.18*ss(p/.3)-.12*ss((p-.7)/.3),op=ss(p/.22)*(1-ss((p-.62)/.38));KF.push({offset:p,transform:at(xx,yy,sw*.35*Math.sin(p*Math.PI*1.3),sc),opacity:op});}
+    d.animate(KF,{duration:T,delay,easing:'linear',fill:'both'}).onfinish=()=>d.remove();
+    lastEnd=Math.max(lastEnd,delay+T);});
+  setTimeout(()=>{cnt.textContent=String(TOTAL);pill();},320+N*STEP+1200);}
+
+/* C12: 「大家晒的」 opened from that line: the three who made it after you come first, each marked like 「作者赞过」; normal order otherwise */
+function followers(){go(4,'照着你做的 3 人排在最前，每条下面标着「照着你做的」；平时打开「大家晒的」还是原来的顺序');
+  const t=clone('s09');const C=t.c;const T=s=>C.find(o=>o.tx&&txt(o)===s);
+  [T('晒好啦')].forEach(o=>{if(o)o._skip=1;});const tbg=C.find(o=>o.f&&o.f[0].c==='rgba(0,0,0,0.75)');if(tbg)tbg._skip=1;
+  C.filter(o=>o.n==='badge · 课代表'&&o.y>300&&o.y<340).forEach(o=>o._skip=1);
+  const ent=[{y0:150,y1:310,name:'我',av:'i13',nm:'番茄炒蛋不放糖',say:'照着做好了，油留着炒肉真的香',to:'照着你说的，油留着炒肉，真的香',img:'i24',tm:'刚刚 广东   回复',tt:'1 小时前 上海   回复'},
+    {y0:310,y1:465,name:'516',av:'i14',nm:'喝不完一瓶可乐',say:'交作业的来了',to:'第一次做卤肉饭就成功了，谢谢你分享',img:'i4',tm:'10-06 福建   回复',tt:'3 小时前 四川   回复'},
+    {y0:465,y1:560,name:'zZ珍珍',av:AV.deer,nm:'小鹿',say:'红葱酥那一步的油别倒，留着炒肉，特别香',to:'看了你的图才敢做，溏心蛋也成了',tm:'7天前 青海   回复',tt:'今天 12:08 广东   回复'}];
+  const isBar=o=>(o.y>=501&&o.w>=239)||(o.y>550&&o.w>80&&o.h<4)||txt(o)==='我也晒一个';
+  ent.forEach((e,k)=>{const nmo=T(e.name);if(nmo)setText(nmo,e.nm);const so=T(e.say);if(so)setText(so,e.to);const tmo=T(e.tm);if(tmo)setText(tmo,e.tt);
+    C.forEach(o=>{if(o._skip||isBar(o)||o.y<e.y0||o.y>=e.y1)return;if(o.t==='EL'&&o.f&&o.f[0].img&&o.x<20)o.f=[{img:e.av}];if(e.img&&o.t==='RE'&&o.f&&o.f[0].img&&Math.abs(o.w-82.8)<1)o.f=[{img:e.img}];});
+    if(tmo){const TW=textW('照着你做的',7.35,'Noto Sans SC',400)+9.8;const tg={t:'RE',x:tmo.x,y:tmo.y+15,w:TW,h:11.3,n:'tag',f:[{c:'#f5f5f5'}],r:3.4},tt={t:'TE',x:tmo.x,y:tmo.y+15,w:TW,h:11.3,n:'tag t',tx:[['照着你做的',7.35,'Noto Sans SC','Regular','#999999',0,0]],al:'C',ar:'F'};
+      const at=C.indexOf(C.find(o=>o.n==='Rectangle'&&o.y>=501&&o.w>=239));C.splice(at,0,tg,tt);e._tags=[tg,tt];}});
+  // make room for the tag line: later entries move down
+  C.forEach(o=>{if(o._skip||isBar(o)||o.n==='tag'||o.n==='tag t')return;if(o.y>=310&&o.y<465)o.y+=16;else if(o.y>=465)o.y+=32;});
+  ent.forEach((e,k)=>(e._tags||[]).forEach(o=>o.y+=k===1?16:k===2?32:0));
+  const oi=overlayIdx(t);
+  // a half sheet over the viewer you came from: the viewer dims, the sheet slides up; closing slides it back down to the viewer
+  render(t,{layerFrom:oi,anim:'up',dy:FH-97,over:true});const me=CUR;
+  const close=()=>{if(CUR!==me)return;const wrap=me.querySelector('.layer .slideup'),dim=me.querySelector(':scope > .layer').firstChild;
+    if(wrap){wrap.style.animation='none';wrap.style.transition='transform .28s cubic-bezier(.4,0,1,1)';requestAnimationFrame(()=>wrap.style.transform=`translateY(${px(FH-97)})`);}
+    if(dim){dim.style.animation='none';dim.style.transition='opacity .28s';requestAnimationFrame(()=>dim.style.opacity=0);}
+    setTimeout(()=>ownViewer({done:true}),290);};
+  hotRect(0,0,FW,92,close,'关闭');hotRect(FW-30,103,26,24,close,'关闭大家晒的');
+  { const plain=C.find(o=>o.n==='ic/c-heart'&&o.svg);C.filter(o=>o.n&&o.n.startsWith('ic/c-heart')&&o.n!=='ic/c-heart'&&o._el).forEach(h=>{h._el.innerHTML=node(plain).innerHTML;}); } // nobody here has your reaction yet: plain hearts
+  setTimeout(()=>{if(path==='C'&&step===4)endCard();},3800);}
+
 
 
 /* ---------- D: edge cases (Figma v9-09 边界与异常) ---------- */
@@ -1033,7 +1170,7 @@ const STARTS={A:s01,B:s02B,C:s03C,D:()=>s02D(0)};
 const JUMP={
   A:[()=>s01(),()=>s02A(),()=>sheetA('全部',true),()=>sheetA('踩过的坑',true)],
   B:[()=>s02B(),()=>s06({jump:true}),()=>{s06({jump:true});s07();}],
-  C:[()=>s03C(),()=>s09(),()=>{s09();go(2,'看到 516 晒的也帮到了你：长按它的爱心');},()=>{s09();s11();}],
+  C:[()=>s03C(),()=>s09(),()=>{s09({quiet:true});viewer516();},()=>s09({mine:true,quiet:true}),()=>{s09({quiet:true});ownViewer({done:true});followers();}],
   D:[()=>s02D(0),()=>{s02D(2);sD1();},()=>sD2(),()=>{sD2();sD3();}]};
 function jump(p,i){clearFlow();path=p;step=i;fit();JUMP[p][i]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
 function start(p){clearFlow();path=p;step=0;NOTE_TOP=null;NOTE_SLIDE=0;rail();fit();STARTS[p]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
