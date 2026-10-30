@@ -1037,10 +1037,14 @@ const JUMP={
   D:[()=>s02D(0),()=>{s02D(2);sD1();},()=>sD2(),()=>{sD2();sD3();}]};
 function jump(p,i){clearFlow();path=p;step=i;fit();JUMP[p][i]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
 function start(p){clearFlow();path=p;step=0;NOTE_TOP=null;NOTE_SLIDE=0;rail();fit();STARTS[p]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
-// width change: start the path again; height change (e.g. the viewer sheet opening): re-fit and reopen the same step
-let rz,lastW=innerWidth,lastH=innerHeight;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{
-  if(Math.abs(innerWidth-lastW)>=2){lastW=innerWidth;lastH=innerHeight;start(path);return;}
-  if(Math.abs(innerHeight-lastH)>=24){lastH=innerHeight;reopen();}},250);});
-const h=(location.hash||'').slice(1).toUpperCase();
-start(['A','B','C','D'].includes(h)?h:'A');
+// size change (window, the viewer sheet opening, an iframe getting its size late): re-fit and reopen the same step
+let rz,lastW=innerWidth,lastH=innerHeight,BOOTED=false;
+const onSize=()=>{clearTimeout(rz);rz=setTimeout(()=>{if(innerWidth<50||innerHeight<50)return;
+  if(!BOOTED){boot();return;}
+  if(Math.abs(innerWidth-lastW)>=2||Math.abs(innerHeight-lastH)>=24){lastW=innerWidth;lastH=innerHeight;reopen();}},200);};
+addEventListener('resize',onSize);if(window.ResizeObserver)new ResizeObserver(onSize).observe(document.documentElement);
+addEventListener('hashchange',()=>{const k=(location.hash||'').slice(1).toUpperCase();if(['A','B','C','D'].includes(k)&&k!==path)start(k);});
+function boot(){BOOTED=true;lastW=innerWidth;lastH=innerHeight;const h=(location.hash||'').slice(1).toUpperCase();start(['A','B','C','D'].includes(h)?h:'A');}
+// a page that opens with no size yet (hidden tab, an iframe not laid out) waits until it has one
+if(innerWidth>=50&&innerHeight>=50)boot();
 </script>
