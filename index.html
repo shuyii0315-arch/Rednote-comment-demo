@@ -17,8 +17,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .rail{width:300px;flex:none;display:flex;flex-direction:column;gap:14px;align-self:flex-start}
 .rail h1{font-size:20px;font-weight:600;margin:0 0 6px 4px;line-height:1.3;letter-spacing:.01em}
 .paths{display:flex;flex-direction:column;gap:6px}
-.path{border-radius:14px;transition:background .2s,box-shadow .2s}
-.path.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06)}
+.path{border-radius:14px;position:relative;z-index:1}
+#paths{position:relative}
+/* one white card that glides to the open section (and follows it while it grows), instead of each section switching its own background */
+.hl{position:absolute;left:0;right:0;top:0;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);z-index:0;pointer-events:none;will-change:transform,height}
 .pathbtn{display:flex;gap:12px;align-items:baseline;text-align:left;padding:13px 16px;border-radius:14px;width:100%}
 .path:not(.on) .pathbtn:hover{background:rgba(255,255,255,.65)}
 .pathbtn .k{font-weight:600;width:24px;height:24px;border-radius:12px;background:#fff;color:#8C8C8C;display:grid;place-items:center;font-size:12px;flex:none;box-shadow:inset 0 0 0 1px #E3E4E8}
@@ -501,12 +503,24 @@ const AV={a516:'i19',deer:'i1'};
 const PATHS={
   A:{name:'找得到',who:'卡住了，想找做过的人怎么说',steps:['01 搜索：按晒过人数排','02 评论区顶部「大家晒的」','03 展开「大家晒的」，按类型筛','04 翻到底没找到，去搜']},
   B:{name:'等得到',who:'想问一句，又不想一直守着',steps:['05 看图有问答，打字提示相似提问','06 点「蹲」，等回答','07 有人答了，通知直达']},
-  C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 看图页：长按爱心送「有用」','11 回看自己的图：表情雨','12 照着你做的人']},
+  C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 看图页：长按爱心送「有用」','11 回看自己的图：表情飘起','12 照着你做的人']},
   D:{name:'边界情况',who:'人少、不想被收、没匹配、图不实',steps:['13 晒的人很少：入口分级','14 不想被收进去：长按移出','15 没找到相似提问：不提示','16 晒的图不是真做的：举报']},
 };
 let path='A',step=0;
 let RAIL_PATH=null;
 const SPRING='cubic-bezier(.32,.72,0,1)'; // critically damped feel, no overshoot (guide UI, not a flick)
+let HL_RUN=0;
+function glideCard(k){const box=$('#paths');let hl=box.querySelector('.hl');const sec=box.querySelector(`.path[data-k="${k}"]`);if(!sec)return;
+  if(!hl){hl=document.createElement('div');hl.className='hl';box.prepend(hl);hl._y=sec.offsetTop;hl._h=sec.offsetHeight;}
+  // where the open section will be once every fold/unfold has finished: its own height and everything above it, at their target heights
+  const secs=[...box.querySelectorAll('.path')],dh=el=>{const pb=el.querySelector('.pbody');return (pb._to==null?pb.offsetHeight:pb._to)-pb.offsetHeight;};
+  let y1=sec.offsetTop;for(const o of secs){if(o===sec)break;y1+=dh(o);}const h1=sec.offsetHeight+dh(sec);
+  const y0=hl._y,h0=hl._h,t0=performance.now(),DUR=REDUCED()?0:380,run=++HL_RUN,ease=p=>1-Math.pow(1-p,3.4);
+  const f=now=>{if(run!==HL_RUN)return;const p=DUR?Math.min(1,(now-t0)/DUR):1,e=ease(p);
+    if(p<1){hl._y=y0+(y1-y0)*e;hl._h=h0+(h1-h0)*e;}else{hl._y=sec.offsetTop;hl._h=sec.offsetHeight;} // then just stay on it
+    hl.style.transform=`translateY(${hl._y}px)`;hl.style.height=hl._h+'px';
+    if(now-t0<DUR+500)requestAnimationFrame(f);};
+  requestAnimationFrame(f);}
 function rail(){
   const steps=PATHS[path].steps;
   const build=()=>{const body=k=>`<div class="pbody"><div class="pin"><ol class="steps">${PATHS[k].steps.map((t,i)=>`<li><button class="stepbtn" data-p="${k}" data-i="${i}">${t}</button></li>`).join('')}<li class="fin" hidden>走完了</li></ol></div></div>`;
@@ -515,18 +529,30 @@ function rail(){
       +`<div class="cur" id="cur" aria-live="polite"><span id="tiptext"></span><span class="note" id="tipnote"></span><div class="acts" id="tacts"></div><div class="ctl" id="tctl"></div></div>`;};
   if(!$('#cur'))build();
   const open=path,changed=RAIL_PATH!==open;RAIL_PATH=open;
+  // FLIP: remember where every row and the hint card sit right now (mid-motion included), so after the change they glide from there instead of jumping
+  const curEl=$('#cur'),flip=REDUCED()?[]:[...document.querySelectorAll('.path.on .steps li'),curEl].map(el=>({el,top:el.getBoundingClientRect().top,vis:el.offsetParent!==null}));
+  const tipOld=$('#tiptext').textContent;
+  flip.forEach(f=>f.el.getAnimations().forEach(a=>{if(a.id==='flip')a.cancel();}));
+  // put the new words and buttons in first, so every height below is measured with the final content (no snap when it settles)
+  $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';
+  $('#tacts').innerHTML=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}">${a.label}</button>`).join('');$('#tctl').innerHTML=step<steps.length?'<button>再来一遍</button>':'';
   // accordion: the open path grows to its content height, the others fold — animated from their current height
   document.querySelectorAll('.path').forEach(sec=>{const k=sec.dataset.k,on=k===open,pb=sec.querySelector('.pbody'),btn=sec.querySelector('.pathbtn');
     sec.classList.toggle('on',on);btn.setAttribute('aria-current',on);btn.setAttribute('aria-expanded',on);
     const from=pb.getBoundingClientRect().height;
     if(on){const li=[...sec.querySelectorAll('.steps li')];li.forEach((el,i)=>{el.className=i<steps.length?(i<step?'done':i===step?'now':''):'fin';if(i===steps.length)el.hidden=step<steps.length;});
       const host=step>=steps.length?li[steps.length]:li[step];const cur=$('#cur');
-      if(cur.parentNode!==host){const was=cur.parentNode&&cur.parentNode!==$('#paths');host.appendChild(cur);cur.classList.remove('in');void cur.offsetWidth;cur.classList.add('in');}}
-    const to=on?pb.firstElementChild.getBoundingClientRect().height:0;
+      if(cur.parentNode!==host){const was=cur.parentNode&&cur.parentNode!==$('#paths')&&!changed;host.appendChild(cur);cur.classList.remove('in');if(!was){void cur.offsetWidth;cur.classList.add('in');}}}
+    const to=on?pb.firstElementChild.getBoundingClientRect().height:0;pb._to=to;
     if(Math.abs(from-to)>.5){pb.style.transition='none';pb.style.height=from+'px';void pb.offsetHeight;pb.style.transition=`height .38s ${SPRING}`;pb.style.height=to+'px';
       clearTimeout(pb._t);pb._t=setTimeout(()=>{if(sec.classList.contains('on'))pb.style.height='auto';},400);}
     else pb.style.height=on?'auto':'0px';});
+  glideCard(open);
   $('#tiptext').textContent=step>=steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP;$('#tipnote').textContent=NOTE||'';mmsg();
+  queueMicrotask(()=>{ // after the buttons below are in place too
+    if(!changed)flip.forEach(f=>{if(!f.vis||!f.el.isConnected||f.el.offsetParent===null)return;const dy=f.top-f.el.getBoundingClientRect().top;if(Math.abs(dy)<.5)return;
+      const a=f.el.animate([{transform:`translateY(${dy}px)`},{transform:'none'}],{duration:420,easing:SPRING});a.id='flip';});
+    const tt=$('#tiptext');if(!REDUCED()&&tt.textContent!==tipOld&&!curEl.classList.contains('in'))[tt,$('#tacts')].forEach(e=>e.animate([{opacity:0},{opacity:1}],{duration:260,delay:60,easing:'ease-out',fill:'backwards'}));});
   const ah=ACTS.map((a,i)=>`<button class="${a.pri?'pri':''}${a.sel?' sel':''}" data-a="${i}" ${a.sel?'aria-pressed="true"':''}>${a.label}</button>`).join('');$('#tacts').innerHTML=ah;$('#macts').innerHTML=ah;$('#mbar').classList.toggle('has-acts',ACTS.length>0);
   document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>ACTS[+b.dataset.a].fn());
   // every step: replay it, or skip to the next one
