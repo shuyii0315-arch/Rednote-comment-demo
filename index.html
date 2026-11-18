@@ -114,7 +114,11 @@ html.m.wide .mhead{position:static;width:430px;max-width:100%;margin:0 auto;padd
 html.m.wide .stage{flex:none;padding-top:0}
 html.m.wide .mbar{position:static;width:406px;margin:14px auto 0}
 /* 电脑版 / 手机版 switch: only on a wide screen (a phone can't fit the desktop layout) */
-.modesw{display:none;position:fixed;top:16px;right:20px;z-index:95;background:#EAEAEC;border-radius:16px;padding:2px;gap:2px}
+.topbar{position:fixed;top:16px;right:20px;z-index:95;display:flex;gap:8px;align-items:center}
+.modesw{display:none;background:#EAEAEC;border-radius:16px;padding:2px;gap:2px}
+.dslink{display:none;height:32px;padding:0 14px;border-radius:16px;background:#EAEAEC;color:#222;font-size:12.5px;align-items:center;text-decoration:none;transition:background .2s}
+.dslink:hover{background:#E0E0E3}
+html.wide .dslink{display:flex}
 html.wide .modesw{display:flex}
 .modesw button{height:28px;padding:0 13px;border-radius:14px;font-size:12.5px;color:#666;transition:background .2s,color .2s,box-shadow .2s}
 .modesw button[aria-pressed="true"]{background:#fff;color:#222;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -215,7 +219,7 @@ button.fol:active{transform:scale(.94)}
 button:focus-visible,.hot:focus-visible{outline:2px solid #3478F6;outline-offset:2px}
 </style>
 
-<div class="modesw" role="group" aria-label="切换 Demo 版本"><button data-m="desktop">电脑版</button><button data-m="phone">手机版</button></div>
+<div class="topbar"><a class="dslink" href="ds/" target="_blank" rel="noopener">Design System ↗</a><div class="modesw" role="group" aria-label="切换 Demo 版本"><button data-m="desktop">电脑版</button><button data-m="phone">手机版</button></div></div>
 <div class="mhead" id="mhead"><div class="mprog" id="mprog"></div><div class="mtrack" id="mtrack" aria-label="跳到某一步"></div></div>
 <div class="stage">
   <aside class="rail" aria-label="Demo 导航">
