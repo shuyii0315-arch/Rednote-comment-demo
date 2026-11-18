@@ -507,7 +507,7 @@ const PATHS={
   B:{name:'等得到',who:'想问一句，又不想一直守着',steps:['05 看图有问答，打字提示相似提问','06 点「蹲」，等回答','07 有人答了，通知直达']},
   C:{name:'被看见',who:'做过了，回来晒一下',steps:['08 评论里直接晒图','09 晒好啦，置顶可见','10 看图页：长按爱心送「有用」','11 回看自己的图：表情飘起','12 照着你做的人']},
   D:{name:'边界情况',who:'人少、不想被收、没匹配、图不实',steps:['13 晒的人很少：入口分级','14 不想被收进去：长按移出','15 没找到相似提问：不提示','16 晒的图不是真做的：举报']},
-  E:{name:'跟着做',who:'新增：做到一半卡住，直接问',steps:['17 跟着视频做，灵动岛就是进度条','18 在底部问「油温多少合适？」','19 光升进灵动岛，读做过的人原话','20 长按回答，告诉 516「有用」','21 收起，接着做']},
+  E:{name:'跟着做',who:'新增：做到一半卡住，直接问',steps:['17 跟着视频做，灵动岛就是进度条','18 点「问一问」，问「油温多少合适？」','19 长按回答，给 516 回个表情','20 收起，接着做']},
 };
 let path='A',step=0;
 let RAIL_PATH=null;
@@ -606,7 +606,7 @@ let TIP='',ACTS=[];const go=(n,tip,acts)=>{step=n;if(tip!=null)TIP=tip;ACTS=(act
 let noteT,NOTE='';function mmsg(){const el=$('#mmsg');if(!el)return;el.innerHTML=NOTE?`<span class="mnote">${NOTE}</span>`:(step>=PATHS[path].steps.length?TIP.replace(/^路径 [A-D] 走完了：/,''):TIP);}
 function note(msg){clearTimeout(noteT);NOTE=msg;const tn=$('#tipnote');if(tn)tn.textContent=msg;mmsg();if(msg)noteT=setTimeout(()=>note(''),2200);}
 function endCard(){const next={A:'B',B:'C',C:'D',D:'E',E:'A'}[path];
-  const msg={A:'按晒过的人数挑笔记，在「大家晒的」里按类型筛出经验；楼里没有，再顺手去搜。',B:'提问前先看相似提问；还没人答就「蹲」着，有人回答才通知。',C:'在评论里顺手晒图；看的人用表情回应，晒的人回看时能感受到，也找得到照着自己做的人。',D:'人少时入口不硬凑；晒的人自己能移出、限制可见；没匹配就不打扰；不实的晒图走举报。',E:'在手边问，答案升进灵动岛；读的是做过的人的原话；一句「有用」让答的人知道帮到了谁。'}[path];
+  const msg={A:'按晒过的人数挑笔记，在「大家晒的」里按类型筛出经验；楼里没有，再顺手去搜。',B:'提问前先看相似提问；还没人答就「蹲」着，有人回答才通知。',C:'在评论里顺手晒图；看的人用表情回应，晒的人回看时能感受到，也找得到照着自己做的人。',D:'人少时入口不硬凑；晒的人自己能移出、限制可见；没匹配就不打扰；不实的晒图走举报。',E:'在手边问，答案升进灵动岛；读的是做过的人的原话；回一个表情，让答的人知道帮到了谁。'}[path];
   step=PATHS[path].steps.length;TIP=`路径 ${path} 走完了：${msg}`;ACTS=[{label:'重来一遍',fn:()=>start(path)},{label:`下一段：${PATHS[next].name}`,pri:1,fn:()=>start(next)}];note('');rail();}
 const idxOf=(t,o)=>t.c.indexOf(o);
 const overlayIdx=(t,nth=0)=>{let n=0;for(let i=0;i<t.c.length;i++){const o=t.c[i];if(o.w>=259&&o.h>=565&&o.f&&o.f[0].c&&o.f[0].c.startsWith('rgba(0,0,0')){if(n++===nth)return i;}}return -1;};
@@ -1198,12 +1198,30 @@ function sD3(){go(3,'这条晒图像是盗来的：长按它，点「举报」')
           sheetCard(sh,38*MK,R,r=>{if(r!=='不是自己做的')return note('这一步选「不是自己做的」');
             close2(()=>{clear();appToast('已提交，核实后会移出「大家晒的」',{delay:120});setTimeout(endCard,1100);});},false);});});});});}
 
-/* ---------- E 跟着做（新增）：每一步在手机里播录屏 ---------- */
-const ETIPS=['跟着视频做：灵动岛就是进度条，第二行是作者这一步的话；手不方便时，说「点点」也能问','手上有油，不碰屏幕：点「问一问」或说「点点」，就在底部输入框里听','说完停一下，光升进灵动岛，在做过这一步的人里找，读原话给你听','觉得有用就长按这条回答，回应条和评论区一样','读完自动收起，视频接着播；快到下料点，灵动岛提前 5 秒提醒'];
-function sE(i){go(i,ETIPS[i],i<4?[{label:'继续',pri:1,fn:()=>sE(i+1)}]:[{label:'看完了',pri:1,fn:()=>endCard()}]);
-  screen.innerHTML='';const v=document.createElement('video');v.src='img/follow/e'+(i+1)+'.mp4';v.poster='img/follow/e'+(i+1)+'.jpg';
-  v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('aria-label',PATHS.E.steps[i].replace(/^\d+ /,''));
-  v.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block';screen.appendChild(v);v.play&&v.play().catch(()=>{});}
+/* ---------- E 跟着做（新增）：手机里放画板上那版能点的原型，跟着你的操作往下走 ---------- */
+const ETIPS=['跟着视频做：灵动岛就是进度条，第二行是作者这一步的话。卡住了，点底部「问一问」','手上有油，不碰屏幕：就在底部输入框里听，说「点点」也一样。说完停一下，光升进灵动岛，在做过这一步的人里找，读原话给你听','觉得有用，就长按灵动岛里的这条回答，选一个表情，和评论区的回应条一样','读完自动收起，视频接着播；也可以上滑或点一下视频收起'];
+let EW=null;
+function protoI(){const f=screen.querySelector('iframe.proto');try{return f&&f.contentWindow.__insts&&f.contentWindow.__insts.R;}catch(e){return null;}}
+function protoFrame(){let f=screen.querySelector('iframe.proto');
+  if(!f){screen.innerHTML='';f=document.createElement('iframe');f.className='proto';f.src='follow/proto.html';f.title='跟着做 · 可以点的原型';f.setAttribute('allow','autoplay');
+    f.style.cssText=`position:absolute;left:0;top:0;width:402px;height:874px;border:0;transform-origin:0 0;transform:scale(${(FW*K/402).toFixed(5)});background:#000`;screen.appendChild(f);}
+  return f;}
+function whenProto(fn){const t0=Date.now();const w=()=>{const I=protoI();if(I&&I.S&&I.S().mode!=='intro'&&I._now!==undefined)fn(I);else if(Date.now()-t0<15000)setTimeout(w,100);};w();}
+const EACTS=[[{label:'帮我点「问一问」',fn:()=>{const I=protoI();I&&I.ask('voice');}}],[],[{label:'帮我长按',fn:()=>{const I=protoI();I&&I.setState({picker:true});}}],[{label:'看完了',pri:1,fn:()=>endCard()}]];
+function sE(i,setup){go(i,ETIPS[i],EACTS[i]);protoFrame();
+  if(EW)clearInterval(EW);
+  whenProto(I=>{if(setup)setup(I);
+    if(!I.__armIdle0)I.__armIdle0=I.armIdle;
+    const PW=protoFrame().contentWindow;I.armIdle=i===2?function(){const me=this;if(me._idle)PW.clearTimeout(me._idle);me._idle=PW.setTimeout(()=>{if(me.S().mode==='answer')me.collapse();},30000);}:I.__armIdle0;if(i===3)I.armIdle();
+    EW=setInterval(()=>{const J=protoI();if(!J||path!=='E'||step!==i){clearInterval(EW);return;}const st=J.S();
+      if(i===0&&(st.mode==='listen'||st.mode==='search')){clearInterval(EW);sE(1);}
+      else if(i===1&&st.mode==='answer'){clearInterval(EW);sE(2);}
+      else if(i===2&&st.toast){clearInterval(EW);sE(3);}
+      else if(i===2&&st.mode==='rest'){note('回答收起了，再点「问一问」问一次');}
+      else if(i===3&&st.mode==='rest'){clearInterval(EW);setTimeout(endCard,900);}},150);});}
+const EJUMP=[()=>sE(0),()=>sE(1,I=>{if(I.S().mode==='rest')I.ask('voice');}),
+  ()=>sE(2,I=>{I._readT=I._now;I.setState({mode:'answer',idx:0,gIdx:0,picker:false});}),
+  ()=>sE(3,I=>{I._readT=I._now;I.setState({mode:'answer',idx:0,gIdx:0,picker:false,toast:true,toastText:'已告诉 516：这句帮到了你'});I.armIdle();})];
 
 /* ---------- boot / sizing ---------- */
 function fit(){applyMode();const compact=document.documentElement.classList.contains('m');const touch=compact&&matchMedia('(pointer:coarse)').matches;
@@ -1230,7 +1248,7 @@ const JUMP={
   B:[()=>s02B(),()=>s06({jump:true}),()=>{s06({jump:true});s07();}],
   C:[()=>s03C(),()=>s09(),()=>{s09({quiet:true});viewer516();},()=>s09({mine:true,quiet:true}),()=>{s09({quiet:true});ownViewer({done:true});followers();}],
   D:[()=>s02D(0),()=>{s02D(2);sD1();},()=>sD2(),()=>{sD2();sD3();}],
-  E:[0,1,2,3,4].map(i=>()=>sE(i))};
+  E:EJUMP};
 function jump(p,i){clearFlow();path=p;step=i;fit();JUMP[p][i]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
 function start(p){clearFlow();path=p;step=0;NOTE_TOP=null;NOTE_SLIDE=0;rail();fit();STARTS[p]();try{history.replaceState(null,'','#'+p.toLowerCase());}catch(e){}}
 // size change (window, the viewer sheet opening, an iframe getting its size late): re-fit and reopen the same step
