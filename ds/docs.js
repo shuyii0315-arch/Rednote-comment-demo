@@ -402,12 +402,13 @@ var nav = $('#nav');
 NAV.forEach(function (g) {
   var grp = el('div', 'grp'), h = el('button', 'h', '<span>' + g[0] + '</span><em>' + g[1].length + '</em>'), ls = el('div', 'ls');
   h.type = 'button'; h.onclick = function () { grp.classList.toggle('open'); };
-  g[1].forEach(function (it) { var a = el('a', '', it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '')); a.href = '#/' + it[0]; a.dataset.id = it[0]; ls.append(a); });
+  var inn = el('div', 'in'); ls.append(inn);
+  g[1].forEach(function (it, i) { var a = el('a', '', it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '')); a.href = '#/' + it[0]; a.dataset.id = it[0]; a.style.setProperty('--i', i); inn.append(a); });
   grp.append(h, ls); nav.append(grp);
 });
 function go() {
   var id = (location.hash.replace(/^#\/?/, '') || 'intro'); if (!P[id]) id = 'intro';
-  var pg = $('#page'); pg.innerHTML = ''; P[id](pg);
+  var pg = $('#page'); pg.innerHTML = ''; P[id](pg); pg.classList.remove('enter'); void pg.offsetWidth; pg.classList.add('enter');
   nav.querySelectorAll('a').forEach(function (a) { a.classList.toggle('on', a.dataset.id === id); });
   nav.querySelectorAll('.grp').forEach(function (g) { g.classList.toggle('open', !!g.querySelector('a.on')); });
   window.scrollTo(0, 0);
