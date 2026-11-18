@@ -15,8 +15,15 @@ a{color:inherit}
 .top span{font-size:12px;color:#8F8F8F;border:1px solid #EAEAEA;border-radius:999px;padding:1px 8px}
 .wrap{display:grid;grid-template-columns:240px minmax(0,1fr);max-width:1280px;margin:0 auto}
 nav{position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto;padding:24px 16px 40px 24px;border-right:1px solid #EAEAEA;box-sizing:border-box}
-nav .h{font-size:12px;color:#8F8F8F;margin:22px 0 6px 8px}
-nav .h:first-child{margin-top:0}
+nav .grp+.grp{margin-top:4px}
+nav .h{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;font-size:13px;color:#4D4D4D;font-weight:500;cursor:pointer}
+nav .h:hover{background:#F5F5F5}
+nav .h::before{content:"";width:5px;height:5px;border-right:1.5px solid #A1A1A1;border-bottom:1.5px solid #A1A1A1;transform:rotate(-45deg);transition:transform .2s;margin:0 2px}
+nav .grp.open .h::before{transform:rotate(45deg)}
+nav .h span{flex:1}
+nav .h em{font-style:normal;font-size:12px;color:#A1A1A1;font-weight:400}
+nav .ls{display:none;padding:2px 0 8px 14px}
+nav .grp.open .ls{display:block}
 nav a{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#4D4D4D;text-decoration:none;padding:6px 8px;border-radius:6px}
 nav a small{font-size:12px;color:#A1A1A1}
 nav a:hover{background:#F5F5F5;color:#171717}

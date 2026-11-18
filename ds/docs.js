@@ -400,13 +400,16 @@ P.motion = function (pg) {
 /* ---------- 目录与路由 ---------- */
 var nav = $('#nav');
 NAV.forEach(function (g) {
-  nav.append(el('div', 'h', g[0]));
-  g[1].forEach(function (it) { var a = el('a', '', it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '')); a.href = '#/' + it[0]; a.dataset.id = it[0]; nav.append(a); });
+  var grp = el('div', 'grp'), h = el('button', 'h', '<span>' + g[0] + '</span><em>' + g[1].length + '</em>'), ls = el('div', 'ls');
+  h.type = 'button'; h.onclick = function () { grp.classList.toggle('open'); };
+  g[1].forEach(function (it) { var a = el('a', '', it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '')); a.href = '#/' + it[0]; a.dataset.id = it[0]; ls.append(a); });
+  grp.append(h, ls); nav.append(grp);
 });
 function go() {
   var id = (location.hash.replace(/^#\/?/, '') || 'intro'); if (!P[id]) id = 'intro';
   var pg = $('#page'); pg.innerHTML = ''; P[id](pg);
   nav.querySelectorAll('a').forEach(function (a) { a.classList.toggle('on', a.dataset.id === id); });
+  nav.querySelectorAll('.grp').forEach(function (g) { g.classList.toggle('open', !!g.querySelector('a.on')); });
   window.scrollTo(0, 0);
 }
 if (window.__H && window.__H !== location.hash) history.replaceState(null, '', window.__H);
