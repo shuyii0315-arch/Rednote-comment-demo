@@ -110,14 +110,80 @@ P.materials = function (pg) {
 };
 P['motion-tokens'] = function (pg) {
   pg.append(el('h1', '', '动效曲线'));
-  pg.append(el('p', 'lead', '原型里 12 条曲线、28 种时长，按用途收成 7 条曲线、7 档时长。点「播放」看每条曲线怎么走。'));
+  pg.append(el('p', 'lead', '原型里 12 条曲线、28 种时长，按用途收成 7 条曲线、7 档时长。每条都配了它在原型里的真实用法，可以勾「慢放」细看。'));
   tokens(function (T) {
-    var s = section(pg, '曲线');
-    Object.keys(T.motion.easing).forEach(function (k) { var o = T.motion.easing[k];
-      ex(s, { layout: 'col', build: function (pv) {
-        pv.innerHTML = '<div style="font-size:13px"><b>--ease-' + k + '</b> <code>' + o.value + '</code><div style="color:#8F8F8F;margin-top:4px">' + (o.use || '') + '</div></div><div style="position:relative;width:100%;height:24px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px #EAEAEA"><i style="position:absolute;left:4px;top:4px;width:16px;height:16px;border-radius:50%;background:#FF2442;transition:left .6s ' + o.value + '"></i></div><button class="btn">播放</button>';
-        var dot = pv.querySelector('i'); pv.querySelector('button').onclick = function () { dot.style.left = dot.style.left === 'calc(100% - 20px)' ? '4px' : 'calc(100% - 20px)'; };
+    var s = section(pg, '曲线', '左边是曲线本身，点沿着曲线走；右边是它在原型里真实用到的地方，用对应的时长自动循环播放。');
+    var bar = el('div', 'mt-bar', '<label><input type="checkbox" id="mtSlow"> 慢放 ×4</label>'); s.append(bar);
+    var SLOW = 1; bar.querySelector('input').onchange = function () { SLOW = this.checked ? 4 : 1; };
+    var D = T.motion.duration, DUR = { standard: D.slow.value, enter: D.moderate.value, exit: D.fast.value, overshoot: D.moderate.value, heartbeat: D.slow.value, burst: D.emphasis.value, fade: D.base.value };
+    var DURN = { standard: 'slow', enter: 'moderate', exit: 'fast', overshoot: 'moderate', heartbeat: 'slow', burst: 'emphasis', fade: 'base' };
+    function bez(v) { var m = /cubic-bezier\(([^)]+)\)/.exec(v); if (m) return m[1].split(',').map(Number); return v === 'ease-out' ? [0, 0, .58, 1] : [0, 0, 1, 1]; }
+    var grid = el('div', 'mt-grid'); s.append(grid);
+    var cards = [];
+    Object.keys(T.motion.easing).forEach(function (k) {
+      var o = T.motion.easing[k], c = bez(o.value), ms = DUR[k] || 300;
+      var card = el('div', 'mt-card');
+      // 曲线图：0..1 映射到带留白的框里，回弹曲线有空间冲出去
+      var W = 150, H = 150, pad = 26, X = function (x) { return pad + x * (W - pad * 2); }, Y = function (y) { return H - pad - y * (H - pad * 2); };
+      var path = 'M' + X(0) + ',' + Y(0) + ' C' + X(c[0]) + ',' + Y(c[1]) + ' ' + X(c[2]) + ',' + Y(c[3]) + ' ' + X(1) + ',' + Y(1);
+      var svg = '<svg class="mt-graph" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' +
+        '<rect x="' + X(0) + '" y="' + Y(1) + '" width="' + (X(1) - X(0)) + '" height="' + (Y(0) - Y(1)) + '" fill="none" stroke="#EDEDED"/>' +
+        '<line x1="' + X(0) + '" y1="' + Y(0) + '" x2="' + X(c[0]) + '" y2="' + Y(c[1]) + '" stroke="#D4D4D4" stroke-dasharray="2 3"/>' +
+        '<line x1="' + X(1) + '" y1="' + Y(1) + '" x2="' + X(c[2]) + '" y2="' + Y(c[3]) + '" stroke="#D4D4D4" stroke-dasharray="2 3"/>' +
+        '<path class="mt-path" d="' + path + '" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round"/></svg>' +
+        '<div class="mt-trace" style="left:' + X(0) + 'px;width:' + (X(1) - X(0)) + 'px;top:' + Y(1) + 'px;height:' + (Y(0) - Y(1)) + 'px"><i class="mx"><b class="my"></b></i></div>';
+      card.innerHTML = '<div class="mt-head"><b>--ease-' + k + '</b><code>' + o.value + '</code></div><div class="mt-use">' + (o.use || '') + ' · <code>--dur-' + DURN[k] + '</code> ' + ms + 'ms</div>' +
+        '<div class="mt-body"><div class="mt-gw">' + svg + '</div><div class="mt-scene" data-k="' + k + '"></div></div>';
+      grid.append(card);
+      var sc = card.querySelector('.mt-scene'), mx = card.querySelector('.mx'), my = card.querySelector('.my');
+      var play = scene(k, sc);
+      cards.push({ card: card, run: function () {
+        var d = ms * SLOW;
+        mx.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(' + (X(1) - X(0)) + 'px)' }], { duration: d, easing: 'linear', fill: 'both' });
+        my.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(' + (Y(1) - Y(0)) + 'px)' }], { duration: d, easing: o.value, fill: 'both' });
+        play(d, o.value);
+        return d;
       } });
+    });
+    function scene(k, sc) {
+      var ph = el('div', 'mt-ph'); sc.append(ph);
+      if (k === 'standard') {
+        ph.innerHTML = '<div class="mt-lines"><i></i><i></i><i></i></div><div class="mt-banner"><span class="av"></span><div><i style="width:70px"></i><i style="width:120px"></i></div></div>';
+        var b = ph.querySelector('.mt-banner');
+        return function (d, e) { b.animate([{ transform: 'translateY(-90px)' }, { transform: 'translateY(0)' }], { duration: d, easing: e, fill: 'both' }); };
+      }
+      if (k === 'enter' || k === 'exit') {
+        ph.innerHTML = '<div class="mt-lines"><i></i><i></i><i></i></div><div class="mt-dim"></div><div class="mt-sheet"><span class="hd"></span><i style="width:60%"></i><i style="width:80%"></i><i style="width:45%"></i></div>';
+        var sh = ph.querySelector('.mt-sheet'), dim = ph.querySelector('.mt-dim');
+        var A = [{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], B = [{ opacity: 0 }, { opacity: 1 }];
+        if (k === 'exit') { A.reverse(); B.reverse(); }
+        return function (d, e) { sh.animate(A, { duration: d, easing: e, fill: 'both' }); dim.animate(B, { duration: d, easing: 'ease-out', fill: 'both' }); };
+      }
+      if (k === 'overshoot') {
+        ph.innerHTML = '<div class="mt-pick">' + RDS.reactions.map(function (r) { return '<span>' + RDS.emoji(r.id, 26) + '</span>'; }).join('') + '</div>';
+        var em = ph.querySelectorAll('.mt-pick span');
+        return function (d, e) { em.forEach(function (x, i) { x.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: d, delay: i * 30 * (d / 340), easing: e, fill: 'both' }); }); };
+      }
+      if (k === 'heartbeat' || k === 'burst') {
+        ph.innerHTML = '<div class="mt-like"><span class="ring"></span>' + '<em></em><em></em><em></em><em></em><em></em><em></em>' + '<svg viewBox="0 0 24 24" width="44" height="44"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" fill="#FF2442"/></svg></div>';
+        var hs = ph.querySelector('svg'), ring = ph.querySelector('.ring'), sp = ph.querySelectorAll('.mt-like em');
+        if (k === 'heartbeat') { ring.remove(); sp.forEach(function (x) { x.remove(); });
+          return function (d, e) { hs.animate([{ transform: 'scale(.6)' }, { transform: 'scale(1.25)', offset: .45 }, { transform: 'scale(1)' }], { duration: d, easing: e, fill: 'both' }); }; }
+        return function (d, e) {
+          hs.animate([{ transform: 'scale(.9)' }, { transform: 'scale(1)' }], { duration: d * .5, easing: e, fill: 'both' });
+          ring.animate([{ transform: 'scale(.4)', opacity: .9 }, { transform: 'scale(1.7)', opacity: 0 }], { duration: d, easing: e, fill: 'both' });
+          sp.forEach(function (x, i) { var a = i * 60 * Math.PI / 180; x.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + Math.cos(a) * 46 + 'px,' + Math.sin(a) * 46 + 'px) scale(.3)', opacity: 0 }], { duration: d, easing: e, fill: 'both' }); });
+        };
+      }
+      ph.innerHTML = '<div class="mt-cmt"><span class="av"></span><div><i style="width:56px"></i><i style="width:130px"></i><i style="width:96px"></i></div></div>';
+      var cm = ph.querySelector('.mt-cmt');
+      return function (d, e) { cm.animate([{ opacity: 0 }, { opacity: 1 }], { duration: d, easing: e, fill: 'both' }); };
+    }
+    // 看得见时自动循环：播完停一会儿再播
+    cards.forEach(function (x) {
+      var vis = false, timer = null;
+      function loop() { if (!vis || !document.body.contains(x.card)) return; var d = x.run(); timer = setTimeout(loop, d + 1100 * SLOW); }
+      new IntersectionObserver(function (en) { var v = en[0].isIntersecting; if (v && !vis) { vis = true; loop(); } else if (!v) { vis = false; clearTimeout(timer); } }, { threshold: .4 }).observe(x.card);
     });
     s = section(pg, '时长'); var t = el('table'); s.append(t);
     t.innerHTML = '<tr><th>token</th><th>毫秒</th><th>用在哪</th></tr>' + Object.keys(T.motion.duration).map(function (k) { var o = T.motion.duration[k]; return '<tr><td><code>--dur-' + k + '</code></td><td>' + o.value + '</td><td>' + (o.use || '') + '</td></tr>'; }).join('');
