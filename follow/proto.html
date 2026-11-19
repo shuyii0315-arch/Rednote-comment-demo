@@ -30,47 +30,64 @@ function renderBoard(name,props,key){var I=inst(key,name,props),v;try{v=I.render
   boards[name].tpl.childNodes.forEach(function(n,i){out=out.concat(walk(n,scope,key+'/'+i));});
   if(I.__new){I.__new=false;if(I.componentDidMount)setTimeout(function(){try{I.componentDidMount();}catch(e){__errs.push(name+' mount: '+e.message)}},0);}
   return out;}
-function tagKey(el,k){el.__k=k;return el;}
+/* 渲染：walk 只生成轻量的描述对象，morph 时只改真正变了的属性和文字，不再每帧重建整棵 DOM */
+var __stc=new WeakMap();
+function isStatic(n){if(__stc.has(n))return __stc.get(n);var r=true;
+  if(n.nodeType===3)r=n.textContent.indexOf('{{')<0;
+  else if(n.nodeType===1){var t=n.tagName.toLowerCase();if(t==='sc-if'||t==='sc-for'||t==='dc-import'||t==='canvas'||t==='video'||t==='input'||t==='textarea'||t==='helmet')r=false;else{for(var a of n.attributes){if(a.value.indexOf('{{')>=0||a.name==='ref'||(a.name.indexOf('on')===0&&a.name.length>2)){r=false;break;}}if(r)for(var c=n.firstChild;c;c=c.nextSibling){if(!isStatic(c)){r=false;break;}}}}
+  __stc.set(n,r);return r;}
 function walk(n,scope,key){
-  if(n.nodeType===3){var tn=document.createTextNode(sub(n.textContent,scope));tn.__k=key;return [tn];}
+  if(n.nodeType===3)return [{text:sub(n.textContent,scope),k:key}];
   if(n.nodeType!==1)return [];
   var tag=n.tagName.toLowerCase(),out=[];
   if(tag==='sc-if'){if(get(scope,whole(n.getAttribute('value'))))n.childNodes.forEach(function(c,i){out=out.concat(walk(c,scope,key+'?'+i))});return out;}
   if(tag==='sc-for'){var list=get(scope,whole(n.getAttribute('list')))||[],as=n.getAttribute('as');list.forEach(function(it,j){var sc=Object.create(scope);sc[as]=it;n.childNodes.forEach(function(c,i){out=out.concat(walk(c,sc,key+'['+j+'].'+i))});});return out;}
   if(tag==='dc-import'){var props={};for(var a of n.attributes){if(a.name==='name'||a.name.indexOf('hint')===0)continue;var w=whole(a.value);props[a.name]=w?get(scope,w):a.value;}
-    var d=document.createElement('div');d.style.cssText='position:relative;width:402px;height:874px';renderBoard(n.getAttribute('name'),props,key+'#'+n.getAttribute('name')).forEach(function(x){d.appendChild(x)});return [tagKey(d,key)];}
+    return [{tag:'div',attrs:[['style','position:relative;width:402px;height:874px']],kids:renderBoard(n.getAttribute('name'),props,key+'#'+n.getAttribute('name')),k:key}];}
+  if(isStatic(n))return [{st:n,k:key}];
   var isSvg=tag==='svg'||n.namespaceURI==='http://www.w3.org/2000/svg';
-  if(isSvg&&!n.hasAttribute('ref')){var t=document.createElement('div');t.innerHTML=sub(n.outerHTML,scope);return [tagKey(t.firstChild,key)];}
-  var el=isSvg?document.createElementNS('http://www.w3.org/2000/svg',tag):document.createElement(tag==='helmet'?'div':tag);
+  if(isSvg&&!n.hasAttribute('ref'))return [{html:sub(n.outerHTML,scope),k:key}];
+  var v={tag:tag,svg:isSvg,attrs:[],on:null,ref:null,kids:[],k:key};
   for(var a of n.attributes){var w=whole(a.value);
-    if(a.name.indexOf('on')===0&&a.name.length>2){var fn=w?get(scope,w):null;if(typeof fn==='function'){(el.__on=el.__on||{})[a.name.slice(2).toLowerCase()]=fn;}continue;}
-    if(a.name==='ref'){var f=w?get(scope,w):null;if(typeof f==='function')REFS.push([el,f]);continue;}
-    el.setAttribute(a.name,sub(a.value,scope));}
-  n.childNodes.forEach(function(c,i){walk(c,scope,key+'.'+i).forEach(function(x){el.appendChild(x)})});
-  return [tagKey(el,key)];}
-function bind(el){if(el.nodeType!==1)return;if(el.__on){el.__b=el.__b||{};for(var ev in el.__on){if(!el.__b[ev]){el.__b[ev]=1;(function(ev){el.addEventListener(ev,function(e){var f=el.__on&&el.__on[ev];if(f)f(e);});})(ev);}}}
-  for(var c=el.firstChild;c;c=c.nextSibling)bind(c);}
-function same(a,b){return a.nodeType===b.nodeType&&(a.nodeType!==1||a.tagName===b.tagName);}
-function patch(o,n){n.__live=o;
-  if(o.nodeType===3){if(o.data!==n.data)o.data=n.data;return;}
-  var oa=o.attributes,na=n.attributes,i;
-  for(i=oa.length-1;i>=0;i--){var nm=oa[i].name;if(!n.hasAttribute(nm)&&!(o.tagName==='CANVAS'&&(nm==='width'||nm==='height')))o.removeAttribute(nm);}
-  for(i=0;i<na.length;i++){var nn=na[i].name,v=na[i].value;if(o.getAttribute(nn)!==v){if(nn==='value'&&document.activeElement===o)continue;o.setAttribute(nn,v);}}
-  o.__on=n.__on;bind1(o);
-  morph(o,n);}
+    if(a.name.indexOf('on')===0&&a.name.length>2){var fn=w?get(scope,w):null;if(typeof fn==='function'){(v.on=v.on||{})[a.name.slice(2).toLowerCase()]=fn;}continue;}
+    if(a.name==='ref'){var f=w?get(scope,w):null;if(typeof f==='function')v.ref=f;continue;}
+    v.attrs.push([a.name,sub(a.value,scope)]);}
+  n.childNodes.forEach(function(c,i){v.kids=v.kids.concat(walk(c,scope,key+'.'+i))});
+  return [v];}
+function bind(el){if(el.nodeType!==1)return;bind1(el);for(var c=el.firstChild;c;c=c.nextSibling)bind(c);}
 function bind1(el){if(el.__on){el.__b=el.__b||{};for(var ev in el.__on){if(!el.__b[ev]){el.__b[ev]=1;(function(ev){el.addEventListener(ev,function(e){var f=el.__on&&el.__on[ev];if(f)f(e);});})(ev);}}}}
+function create(v){var el;
+  if(v.text!=null){el=document.createTextNode(v.text);}
+  else if(v.html!=null){var t=document.createElement('div');t.innerHTML=v.html;el=t.firstChild||document.createTextNode('');el.__html=v.html;}
+  else if(v.st){el=v.st.cloneNode(true);el.__sk=v.st;}
+  else{el=v.svg?document.createElementNS('http://www.w3.org/2000/svg',v.tag):document.createElement(v.tag==='helmet'?'div':v.tag);
+    for(var i=0;i<v.attrs.length;i++)el.setAttribute(v.attrs[i][0],v.attrs[i][1]);
+    el.__on=v.on;if(v.ref)REFS.push([el,v.ref]);
+    for(var j=0;j<v.kids.length;j++){var c=create(v.kids[j]);el.appendChild(c);}}
+  el.__k=v.k;return el;}
+function same(o,v){if(v.st)return o.__sk===v.st;if(v.html!=null)return o.__html!==undefined;if(v.text!=null)return o.nodeType===3;
+  return o.nodeType===1&&o.__html===undefined&&o.__sk===undefined&&o.localName.toLowerCase()===(v.tag==='helmet'?'div':v.tag);}
+function patch(o,v){
+  if(v.text!=null){if(o.data!==v.text)o.data=v.text;return o;}
+  if(v.st)return o;
+  if(v.html!=null){if(o.__html===v.html)return o;var n=create(v);o.parentNode.replaceChild(n,o);bind(n);return n;}
+  var want={},i;for(i=0;i<v.attrs.length;i++)want[v.attrs[i][0]]=v.attrs[i][1];
+  var oa=o.attributes;for(i=oa.length-1;i>=0;i--){var nm=oa[i].name;if(!(nm in want)&&!(o.tagName==='CANVAS'&&(nm==='width'||nm==='height')))o.removeAttribute(nm);}
+  for(i=0;i<v.attrs.length;i++){var nn=v.attrs[i][0],val=v.attrs[i][1];if(o.getAttribute(nn)!==val){if(nn==='value'&&document.activeElement===o)continue;o.setAttribute(nn,val);}}
+  o.__on=v.on;bind1(o);if(v.ref)REFS.push([o,v.ref]);
+  morph(o,v.kids);return o;}
 function keyOf(c,i){return c.__k||('#'+i+(c.nodeName||''));}
-function morph(op,np){
+function morph(op,kids){
   var olds=Array.prototype.slice.call(op.childNodes),map=new Map();
   olds.forEach(function(c,i){map.set(keyOf(c,i),c);});
-  var news=Array.prototype.slice.call(np.childNodes),used=new Set(),ref=op.firstChild;
-  news.forEach(function(nc,i){var k=keyOf(nc,i),oc=map.get(k);
-    if(oc&&!used.has(oc)&&same(oc,nc)){used.add(oc);patch(oc,nc);if(oc!==ref)op.insertBefore(oc,ref);else ref=ref.nextSibling;}
-    else{op.insertBefore(nc,ref);bind(nc);}});
-  olds.forEach(function(c){if(!used.has(c)&&c.parentNode===op)op.removeChild(c);});}
-function render(){REFS=[];var frag=document.createElement('div');renderBoard(rootName,window.__props||{},'R').forEach(function(x){frag.appendChild(x)});
-  morph(root,frag);
-  REFS.forEach(function(p){var live=p[0].__live||p[0];if(live.__ref!==p[1]){live.__ref=p[1];try{p[1](live);}catch(e){__errs.push('ref: '+e.message)}}});}
+  var used=new Set(),ref=op.firstChild;
+  kids.forEach(function(v){var oc=map.get(v.k),node;
+    if(oc&&!used.has(oc)&&same(oc,v)){used.add(oc);var wr=(oc===ref);node=patch(oc,v);used.add(node);if(wr)ref=node;if(node!==ref)op.insertBefore(node,ref);else ref=ref.nextSibling;}
+    else{node=create(v);op.insertBefore(node,ref);bind(node);}});
+  Array.prototype.slice.call(op.childNodes).forEach(function(c){if(!used.has(c)&&olds.indexOf(c)>=0&&c.parentNode===op)op.removeChild(c);});}
+function render(){REFS=[];var vk=renderBoard(rootName,window.__props||{},'R');
+  morph(root,vk);
+  REFS.forEach(function(p){var live=p[0];if(live.__ref!==p[1]){live.__ref=p[1];try{p[1](live);}catch(e){__errs.push('ref: '+e.message)}}});}
 window.start=function(name){rootName=name;root=document.getElementById('root');render();(function loop(){try{render();}catch(e){__errs.push(e.message)}requestAnimationFrame(loop);})();};
 })();
 </script>
