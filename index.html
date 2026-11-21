@@ -1207,7 +1207,7 @@ const ETIPS=['跟着视频做：灵动岛就是进度条，第二行是作者这
 let EW=null;
 function protoI(){const f=screen.querySelector('iframe.proto');try{return f&&f.contentWindow.__insts&&f.contentWindow.__insts.R;}catch(e){return null;}}
 function protoFrame(){let f=screen.querySelector('iframe.proto');
-  if(!f){screen.innerHTML='';f=document.createElement('iframe');f.className='proto';f.src='follow/proto.html?v=5';f.title='跟着做 · 可以点的原型';f.setAttribute('allow','autoplay');
+  if(!f){screen.innerHTML='';f=document.createElement('iframe');f.className='proto';f.src='follow/proto.html?v=6';f.title='跟着做 · 可以点的原型';f.setAttribute('allow','autoplay');
     f.style.cssText=`position:absolute;left:0;top:0;width:402px;height:874px;border:0;transform-origin:0 0;transform:scale(${(FW*K/402).toFixed(5)});background:#000`;screen.appendChild(f);}
   return f;}
 function whenProto(fn){const t0=Date.now();const w=()=>{const I=protoI();if(I&&I.S&&I.S().mode!=='intro'&&I._now!==undefined)fn(I);else if(Date.now()-t0<15000)setTimeout(w,100);};w();}
